@@ -2,6 +2,7 @@ name: Build Print Agent (Windows)
 
 on:
   push:
+    branches: [ main ]
     paths:
       - 'print-agent/**'
       - '.github/workflows/build-agent.yml'
