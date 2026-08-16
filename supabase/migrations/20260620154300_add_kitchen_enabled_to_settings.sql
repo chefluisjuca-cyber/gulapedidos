@@ -1,0 +1,1 @@
+ALTER TABLE restaurant_settings ADD COLUMN IF NOT EXISTS kitchen_enabled boolean DEFAULT false;
