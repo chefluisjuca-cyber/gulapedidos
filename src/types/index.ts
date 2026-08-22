@@ -687,6 +687,9 @@ export interface IfoodOrderIntegration {
   neighborhood: string | null;
   complement: string | null;
   postal_code: string | null;
+  city: string | null;
+  reference: string | null;
+  formatted_address: string | null;
   latitude: number | null;
   longitude: number | null;
   created_at: string;
