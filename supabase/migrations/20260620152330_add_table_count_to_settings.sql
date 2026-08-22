@@ -1,0 +1,1 @@
+ALTER TABLE restaurant_settings ADD COLUMN IF NOT EXISTS table_count integer DEFAULT 10;

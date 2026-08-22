@@ -1,0 +1,1 @@
+ALTER TABLE fila_espera ADD COLUMN IF NOT EXISTS chamado_em TIMESTAMPTZ;
