@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { ArrowRight, Sparkles } from 'lucide-react';
 
 const SORO_EMBED_ID = 'soro-blog';
@@ -37,6 +37,8 @@ function GulaCta() {
 
 export default function SoroBlogEmbed() {
   const containerRef = useRef<HTMLDivElement>(null);
+  const location = useLocation();
+  const isArticlePage = /^\/blog\/[^/]+/.test(location.pathname);
 
   useEffect(() => {
     // Avoid duplicate script injection in dev / re-renders
@@ -60,7 +62,7 @@ export default function SoroBlogEmbed() {
   return (
     <div>
       <div id={SORO_EMBED_ID} ref={containerRef} />
-      <GulaCta />
+      {isArticlePage && <GulaCta />}
     </div>
   );
 }
