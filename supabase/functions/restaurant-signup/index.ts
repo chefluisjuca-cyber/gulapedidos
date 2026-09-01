@@ -141,7 +141,7 @@ Deno.serve(async (req: Request) => {
     let welcomeSent = false;
     let wapiError: string | null = null;
     if (phone) {
-      const linkPainel = (Deno.env.get("LINK_PANEL_APP") || "https://gulapedidos.com.br").replace(/\/+$/, "");
+      const linkPainel = "https://gulapedidos.com.br";
       const panelUrl = `${linkPainel}/${restaurant.slug}`;
       console.log("restaurant-signup: panel URL for welcome message:", panelUrl, "| linkPainel:", linkPainel, "| slug:", restaurant.slug);
       const welcomeMessage = `Fala, ${restaurant.name}! 🚀 Seja bem-vindo(a) ao Gula! Seu teste grátis de 7 dias tá liberado.
