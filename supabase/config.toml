@@ -1,0 +1,32 @@
+[functions.ai-validade-chat]
+verify_jwt = true
+
+[functions.ai-validade]
+verify_jwt = true
+
+[functions.create-auth-user]
+verify_jwt = false
+
+[functions.ifood-webhook]
+verify_jwt = false
+
+[functions.knowledge-base-chat]
+verify_jwt = true
+
+[functions.print-agent]
+verify_jwt = true
+
+[functions.restaurant-signup]
+verify_jwt = false
+
+[functions.stripe-checkout]
+verify_jwt = false
+
+[functions.stripe-webhook]
+verify_jwt = false
+
+[functions.whatsapp-send]
+verify_jwt = true
+
+[functions.trial-onboarding]
+verify_jwt = false

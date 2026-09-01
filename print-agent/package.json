@@ -1,0 +1,60 @@
+{
+  "name": "gula-print-agent",
+  "version": "1.0.1",
+  "description": "Print Agent desktop para impressão térmica silenciosa — Gula SaaS",
+  "main": "dist/main.js",
+  "author": "Gula SaaS",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/chefluisjuca-cyber/gulapedidos.git"
+  },
+  "scripts": {
+    "dev": "tsc && tsc -p tsconfig.renderer.json && node copy-assets.js && electron .",
+    "build": "tsc && tsc -p tsconfig.renderer.json && node copy-assets.js",
+    "dist": "tsc && tsc -p tsconfig.renderer.json && node copy-assets.js && electron-builder --win --x64",
+    "dist:portable": "tsc && tsc -p tsconfig.renderer.json && node copy-assets.js && electron-builder --win portable",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.0",
+    "electron": "^31.0.0",
+    "electron-builder": "^24.13.3",
+    "ncp": "^2.0.0",
+    "typescript": "^5.5.0"
+  },
+  "dependencies": {
+    "node-fetch": "^2.7.0"
+  },
+  "build": {
+    "appId": "com.gula.printagent",
+    "productName": "Gula Print Agent",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "node_modules/**/*",
+      "assets/**/*"
+    ],
+    "win": {
+      "target": "nsis",
+      "icon": "assets/icon.png",
+      "verifyUpdateCodeSignature": false
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "runAfterFinish": true,
+      "shortcutName": "Gula Print Agent"
+    },
+    "publish": {
+      "provider": "github",
+      "owner": "chefluisjuca-cyber",
+      "repo": "gulapedidos"
+    }
+  }
+}

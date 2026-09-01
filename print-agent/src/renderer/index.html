@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline';">
+  <title>Gula Print Agent</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div id="app">
+    <!-- Title bar -->
+    <div class="titlebar">
+      <div class="titlebar-left">
+        <div class="logo-icon">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="6 9 6 2 18 2 18 9"></polyline>
+            <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path>
+            <rect x="6" y="14" width="12" height="8"></rect>
+          </svg>
+        </div>
+        <span class="titlebar-title">Gula Print Agent</span>
+      </div>
+      <div class="titlebar-right">
+        <button id="btn-minimize" class="titlebar-btn" title="Minimizar">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+        </button>
+        <button id="btn-close" class="titlebar-btn titlebar-btn-close" title="Fechar">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+        </button>
+      </div>
+    </div>
+
+    <!-- Step 1: Connect -->
+    <div id="step-connect" class="step active">
+      <div class="step-content">
+        <div class="hero">
+          <div class="hero-icon">
+            <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="6 9 6 2 18 2 18 9"></polyline>
+              <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path>
+              <rect x="6" y="14" width="12" height="8"></rect>
+            </svg>
+          </div>
+          <h1>Bem-vindo!</h1>
+          <p>Cole a Chave de API exibida no painel do seu restaurante (Impressão Térmica).</p>
+        </div>
+
+        <div class="form-group">
+          <label for="token-input">Chave de API</label>
+          <textarea id="token-input" placeholder="Cole a chave de API aqui..." rows="3" spellcheck="false"></textarea>
+        </div>
+
+        <button id="btn-connect" class="btn-primary">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
+          Conectar
+        </button>
+
+        <div id="connect-error" class="error-msg hidden"></div>
+      </div>
+    </div>
+
+    <!-- Step 2: Configure printers -->
+    <div id="step-configure" class="step">
+      <div class="step-content">
+        <div class="status-badge status-connected">
+          <span class="status-dot"></span>
+          Conectado ao SaaS
+        </div>
+
+        <h2>Configurar Impressoras</h2>
+        <p class="subtitle">Selecione quais impressoras do Windows serão usadas para cada setor.</p>
+
+        <div class="toggle-row">
+          <label class="toggle">
+            <input type="checkbox" id="same-printer">
+            <span class="toggle-slider"></span>
+          </label>
+          <span>Usar a mesma impressora para Caixa e Cozinha</span>
+        </div>
+
+        <div class="form-group">
+          <label for="caixa-select">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="14" rx="2"></rect><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"></path></svg>
+            Impressora do Caixa
+          </label>
+          <select id="caixa-select" class="select"></select>
+        </div>
+
+        <div id="cozinha-group" class="form-group">
+          <label for="cozinha-select">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 13.87A4 4 0 0 1 7.41 6a5.11 5.11 0 0 1 1.05-1.54l5.34-5.34a6.46 6.46 0 0 1 9.14 0 6.46 6.46 0 0 1 0 9.14l-5.34 5.34a5.11 5.11 0 0 1-1.54 1.05A4 4 0 0 1 6 13.87z"></path></svg>
+            Impressora da Cozinha
+          </label>
+          <select id="cozinha-select" class="select"></select>
+        </div>
+
+        <button id="btn-save-config" class="btn-primary">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>
+          Salvar Configuração
+        </button>
+
+        <div id="save-success" class="success-msg hidden">Configuração salva!</div>
+      </div>
+    </div>
+
+    <!-- Step 3: Test & status -->
+    <div id="step-test" class="step">
+      <div class="step-content">
+        <div class="status-badge status-connected" id="agent-status">
+          <span class="status-dot"></span>
+          <span id="status-text">Conectado ao SaaS</span>
+        </div>
+
+        <h2>Tudo Pronto!</h2>
+        <p class="subtitle">O Print Agent está rodando em segundo plano. Novos pedidos serão impressos automaticamente.</p>
+
+        <div class="info-card">
+          <div class="info-row">
+            <span class="info-label">Caixa:</span>
+            <span id="info-caixa" class="info-value">—</span>
+          </div>
+          <div class="info-row">
+            <span class="info-label">Cozinha:</span>
+            <span id="info-cozinha" class="info-value">—</span>
+          </div>
+        </div>
+
+        <button id="btn-test-print" class="btn-primary btn-large">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>
+          Imprimir Página de Teste
+        </button>
+
+        <div id="test-result" class="result-msg hidden"></div>
+
+        <div class="log-section">
+          <h3>Histórico de Impressão</h3>
+          <div id="print-log" class="log-list">
+            <p class="log-empty">Nenhuma impressão ainda.</p>
+          </div>
+        </div>
+
+        <button id="btn-disconnect" class="btn-secondary">Desconectar</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="renderer.js"></script>
+</body>
+</html>
