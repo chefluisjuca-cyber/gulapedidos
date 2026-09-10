@@ -6,6 +6,7 @@ import { Order, WaiterCall, OrderStatus, RestaurantSettings, OrderMessage } from
 import { printKitchen, printReceipt, printReceiptUSB, printKitchenUSB } from '../../lib/print';
 import { hasPairedPrinter } from '../../lib/usb-printer';
 import CashierOrderDrawer from './CashierOrderDrawer';
+import AddOrderItemsModal from './AddOrderItemsModal';
 import FloatingOrderMonitor from './FloatingOrderMonitor';
 import { useTenant } from '../../lib/tenant-context';
 
@@ -92,6 +93,7 @@ export default function OrdersKDS() {
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [notifPerm, setNotifPerm] = useState<NotificationPermission>('default');
   const [showCashierDrawer, setShowCashierDrawer] = useState(false);
+  const [showAddItemsForOrder, setShowAddItemsForOrder] = useState<Order | null>(null);
   const [motoboys, setMotoboys] = useState<Motoboy[]>([]);
   const [acceptModal, setAcceptModal] = useState<AcceptModal | null>(null);
 
@@ -784,7 +786,17 @@ export default function OrdersKDS() {
 
           {/* Items */}
           <div className="space-y-2">
-            <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Itens</h4>
+            <div className="flex items-center justify-between">
+              <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Itens</h4>
+              {(order.status === 'preparing' || order.status === 'ready') && (
+                <button
+                  onClick={() => setShowAddItemsForOrder(order)}
+                  className="flex items-center gap-1 text-[11px] font-semibold px-2.5 py-1 rounded-lg bg-amber-500/15 text-amber-300 border border-amber-500/25 hover:bg-amber-500/25 transition-colors"
+                >
+                  <PlusCircle className="w-3 h-3" /> Adicionar Itens
+                </button>
+              )}
+            </div>
             {(order.order_items ?? []).map(item => (
               <div key={item.id} className="flex items-start justify-between">
                 <div className="flex-1 min-w-0">
@@ -1230,6 +1242,16 @@ export default function OrdersKDS() {
             </div>
           </div>
         </div>
+      )}
+
+      {showAddItemsForOrder && (
+        <AddOrderItemsModal
+          order={showAddItemsForOrder}
+          onClose={() => setShowAddItemsForOrder(null)}
+          onItemsAdded={() => {
+            setShowAddItemsForOrder(null);
+          }}
+        />
       )}
     </div>
   );
