@@ -1,6 +1,6 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { ArrowRight, Sparkles } from 'lucide-react';
+import { ArrowRight, Sparkles, ChevronDown } from 'lucide-react';
 
 const SORO_EMBED_ID = 'soro-blog';
 const SORO_SCRIPT_SRC = 'https://app.trysoro.com/api/embed/e633213f-35fd-4a83-b615-3184e9f084d1';
@@ -43,6 +43,7 @@ export default function SoroBlogEmbed({ maxPosts }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const location = useLocation();
   const isArticlePage = /^\/blog\/[^/]+/.test(location.pathname);
+  const [expanded, setExpanded] = useState(false);
 
   useEffect(() => {
     if (document.getElementById('soro-embed-script')) return;
@@ -67,7 +68,7 @@ export default function SoroBlogEmbed({ maxPosts }: Props) {
     const container = containerRef.current;
     if (!container) return;
 
-    let linkAdded = false;
+    let buttonAdded = false;
 
     function applyLimit() {
       const embed = document.getElementById(SORO_EMBED_ID);
@@ -77,22 +78,49 @@ export default function SoroBlogEmbed({ maxPosts }: Props) {
       const posts = embed.querySelectorAll('article, [data-soro-post], .soro-post, a[href*="/blog/"]');
       if (posts.length === 0) return;
 
+      const limit = expanded ? Infinity : maxPosts!;
+
       posts.forEach((post, idx) => {
         const el = post as HTMLElement;
-        if (idx >= maxPosts!) {
+        if (idx >= limit) {
           el.style.display = 'none';
         } else {
-          el.style.display = '';
+          if (idx >= maxPosts! && !expanded) {
+            el.style.display = 'none';
+          } else {
+            el.style.display = '';
+            if (idx >= maxPosts!) {
+              el.style.opacity = '0';
+              el.style.transform = 'translateY(12px)';
+              requestAnimationFrame(() => {
+                el.style.transition = 'opacity 0.4s ease, transform 0.4s ease';
+                el.style.opacity = '1';
+                el.style.transform = 'translateY(0)';
+              });
+            }
+          }
         }
       });
 
-      if (!linkAdded) {
-        linkAdded = true;
+      if (!buttonAdded && posts.length > maxPosts!) {
+        buttonAdded = true;
         const wrapper = document.createElement('div');
+        wrapper.id = 'soro-expand-wrapper';
         wrapper.style.textAlign = 'center';
         wrapper.style.marginTop = '2.5rem';
-        wrapper.innerHTML = `<a href="/blog" style="display:inline-flex;align-items:center;gap:0.5rem;padding:0.875rem 2rem;border-radius:9999px;background:#ea580c;color:white;font-weight:700;font-size:0.95rem;text-decoration:none;transition:background 0.2s;">Ver todos os artigos →</a>`;
+        const btn = document.createElement('button');
+        btn.id = 'soro-expand-btn';
+        btn.style.cssText = 'display:inline-flex;align-items:center;gap:0.5rem;padding:0.875rem 2rem;border-radius:9999px;background:#ea580c;color:white;font-weight:700;font-size:0.95rem;border:none;cursor:pointer;transition:background 0.2s;';
+        btn.textContent = expanded ? 'Ver menos artigos' : 'Ver todos os artigos';
+        btn.addEventListener('click', () => setExpanded(prev => !prev));
+        wrapper.appendChild(btn);
         embed.appendChild(wrapper);
+      }
+
+      // Update button label when expanded state changes
+      const existingBtn = document.getElementById('soro-expand-btn') as HTMLButtonElement | null;
+      if (existingBtn) {
+        existingBtn.textContent = expanded ? 'Ver menos artigos' : 'Ver todos os artigos';
       }
     }
 
@@ -111,7 +139,7 @@ export default function SoroBlogEmbed({ maxPosts }: Props) {
       clearTimeout(timeout);
       clearTimeout(timeout2);
     };
-  }, [maxPosts]);
+  }, [maxPosts, expanded]);
 
   return (
     <div>

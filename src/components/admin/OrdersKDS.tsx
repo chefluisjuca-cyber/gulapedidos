@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { Clock, ChefHat, CheckCircle, Bell, MapPin, Receipt, MessageSquare, Volume2, VolumeX, Printer, UtensilsCrossed, PlusCircle, BellOff, Trophy, Coins, Percent, Gift, Check, X, Truck, Navigation, Phone, Timer, User, Store, Bike, ClipboardList, ArrowRight, MessageCircle, Send } from 'lucide-react';
+import { Clock, ChefHat, CheckCircle, Bell, MapPin, Receipt, MessageSquare, Volume2, VolumeX, Printer, UtensilsCrossed, PlusCircle, BellOff, Trophy, Coins, Percent, Gift, Check, X, Truck, Navigation, Phone, Timer, User, Store, Bike, ClipboardList, ArrowRight, MessageCircle, Send, Hash } from 'lucide-react';
 import TutorialHelpButton from './TutorialHelpButton';
 import { supabase, normalizeOrderItems } from '../../lib/supabase';
 import { Order, WaiterCall, OrderStatus, RestaurantSettings, OrderMessage } from '../../types';
@@ -94,6 +94,8 @@ export default function OrdersKDS() {
   const [notifPerm, setNotifPerm] = useState<NotificationPermission>('default');
   const [showCashierDrawer, setShowCashierDrawer] = useState(false);
   const [showAddItemsForOrder, setShowAddItemsForOrder] = useState<Order | null>(null);
+  const [showTableAssignForOrder, setShowTableAssignForOrder] = useState<Order | null>(null);
+  const [tableAssignLoading, setTableAssignLoading] = useState(false);
   const [motoboys, setMotoboys] = useState<Motoboy[]>([]);
   const [acceptModal, setAcceptModal] = useState<AcceptModal | null>(null);
 
@@ -447,6 +449,18 @@ export default function OrdersKDS() {
     ].filter(Boolean).join(', ');
   }
 
+  async function assignTable(order: Order, tableNum: string) {
+    setTableAssignLoading(true);
+    await supabase.from('orders').update({
+      table_number: tableNum,
+      service_mode: 'table',
+      updated_at: new Date().toISOString(),
+    }).eq('id', order.id);
+    setTableAssignLoading(false);
+    setShowTableAssignForOrder(null);
+    fetchData();
+  }
+
   async function resolveCall(id: string) {
     await supabase.from('waiter_calls').update({ status: 'resolved' }).eq('id', id);
     fetchData();
@@ -788,14 +802,24 @@ export default function OrdersKDS() {
           <div className="space-y-2">
             <div className="flex items-center justify-between">
               <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Itens</h4>
-              {(order.status === 'preparing' || order.status === 'ready') && (
-                <button
-                  onClick={() => setShowAddItemsForOrder(order)}
-                  className="flex items-center gap-1 text-[11px] font-semibold px-2.5 py-1 rounded-lg bg-amber-500/15 text-amber-300 border border-amber-500/25 hover:bg-amber-500/25 transition-colors"
-                >
-                  <PlusCircle className="w-3 h-3" /> Adicionar Itens
-                </button>
-              )}
+              <div className="flex items-center gap-2">
+                {order.delivery_mode !== 'delivery' && (order.status === 'preparing' || order.status === 'ready') && (
+                  <button
+                    onClick={() => setShowTableAssignForOrder(order)}
+                    className="flex items-center gap-1 text-[11px] font-semibold px-2.5 py-1 rounded-lg bg-blue-500/15 text-blue-300 border border-blue-500/25 hover:bg-blue-500/25 transition-colors"
+                  >
+                    <Hash className="w-3 h-3" /> Atribuir Mesa
+                  </button>
+                )}
+                {(order.status === 'preparing' || order.status === 'ready') && (
+                  <button
+                    onClick={() => setShowAddItemsForOrder(order)}
+                    className="flex items-center gap-1 text-[11px] font-semibold px-2.5 py-1 rounded-lg bg-amber-500/15 text-amber-300 border border-amber-500/25 hover:bg-amber-500/25 transition-colors"
+                  >
+                    <PlusCircle className="w-3 h-3" /> Adicionar Itens
+                  </button>
+                )}
+              </div>
             </div>
             {(order.order_items ?? []).map(item => (
               <div key={item.id} className="flex items-start justify-between">
@@ -1253,6 +1277,65 @@ export default function OrdersKDS() {
           }}
         />
       )}
+
+      {showTableAssignForOrder && (() => {
+        const tableCount = settings?.table_count ?? 10;
+        const allTables = Array.from({ length: tableCount }, (_, i) => String(i + 1).padStart(2, '0'));
+        const occupiedTables = new Set(
+          orders
+            .filter(o => o.delivery_mode !== 'delivery' && o.service_mode === 'table' && o.id !== showTableAssignForOrder.id && (o.status === 'pending' || o.status === 'preparing' || o.status === 'ready'))
+            .map(o => String(o.table_number).padStart(2, '0'))
+        );
+        const currentTable = String(showTableAssignForOrder.table_number).padStart(2, '0');
+
+        return (
+          <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
+            <div className="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-md">
+              <div className="flex items-center justify-between p-5 border-b border-slate-800">
+                <h3 className="font-bold text-white flex items-center gap-2">
+                  <Hash className="w-4 h-4 text-amber-400" /> Atribuir Mesa
+                </h3>
+                <button onClick={() => setShowTableAssignForOrder(null)} className="text-slate-400 hover:text-white">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              <div className="p-5 space-y-4">
+                <p className="text-xs text-slate-400">
+                  Pedido <span className="text-amber-400 font-bold">#{orderDisplayNumber(showTableAssignForOrder)}</span>
+                  {' — '}
+                  {showTableAssignForOrder.service_mode === 'table'
+                    ? `Mesa atual: ${currentTable}`
+                    : 'Balcão (sem mesa)'}
+                </p>
+                <div className="grid grid-cols-5 gap-2">
+                  {allTables.map(t => {
+                    const isOccupied = occupiedTables.has(t);
+                    const isCurrent = t === currentTable;
+                    return (
+                      <button
+                        key={t}
+                        disabled={isOccupied || tableAssignLoading}
+                        onClick={() => assignTable(showTableAssignForOrder, t)}
+                        className={`flex flex-col items-center justify-center gap-0.5 py-3 rounded-xl border text-sm font-bold transition-all ${
+                          isCurrent
+                            ? 'bg-amber-500 text-black border-amber-400'
+                            : isOccupied
+                              ? 'bg-slate-800/50 text-slate-600 border-slate-700/50 cursor-not-allowed'
+                              : 'bg-slate-800 text-green-300 border-green-500/20 hover:border-green-500/50 hover:bg-slate-700'
+                        }`}
+                      >
+                        <span className="text-xs opacity-60">Mesa</span>
+                        {t}
+                        {isOccupied && <span className="text-[9px] font-normal opacity-60">ocupada</span>}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }
