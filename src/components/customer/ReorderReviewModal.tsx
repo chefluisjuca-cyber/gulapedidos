@@ -1,6 +1,7 @@
-import { useState } from 'react';
-import { X, Minus, Plus, Trash2, RotateCcw, ShoppingBag, AlertCircle } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { X, Minus, Plus, Trash2, RotateCcw, ShoppingBag, AlertCircle, Loader2 } from 'lucide-react';
 import { Order, CartItem, Product } from '../../types';
+import { supabase } from '../../lib/supabase';
 
 interface Props {
   order: Order;
@@ -10,35 +11,86 @@ interface Props {
 }
 
 export default function ReorderReviewModal({ order, products, onConfirm, onClose }: Props) {
-  const [items, setItems] = useState<CartItem[]>(() => {
-    return (order.order_items ?? []).map(oi => {
-      const product = products.find(p => p.id === oi.product_id);
-      if (!product) return null;
-      return {
-        cartId: crypto.randomUUID(),
-        product,
-        quantity: oi.quantity,
-        comboSelections: (oi.customizations?.combos ?? []).map((c: { groupName: string; items: { name: string; qty: number; observations?: string | null }[] }) => ({
-          groupId: '', groupName: c.groupName,
-          items: c.items.map((i: { name: string; qty: number; observations?: string | null }) => ({
-            id: '', name: i.name, qty: i.qty, priceDelta: 0, observations: i.observations ?? null,
-          })),
-        })),
-        extraSelections: (oi.customizations?.extras ?? []).map((e: { name: string; price: number; qty: number }) => ({
-          extraId: '', name: e.name, price: e.price, qty: e.qty,
-        })),
-        meioAMeioSelection: oi.customizations?.meio_a_meio ?? undefined,
-        itemTotal: oi.unit_price,
-        observations: oi.customizations?.observations ?? undefined,
-      } as CartItem;
-    }).filter(Boolean) as CartItem[];
-  });
+  const [items, setItems] = useState<CartItem[]>([]);
+  const [missingNames, setMissingNames] = useState<string[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const [missingNames, setMissingNames] = useState<string[]>(() => {
-    return (order.order_items ?? [])
-      .filter(oi => !products.find(p => p.id === oi.product_id))
-      .map(oi => oi.product_name);
-  });
+  useEffect(() => {
+    (async () => {
+      setLoading(true);
+      const orderItems = order.order_items ?? [];
+      if (orderItems.length === 0) { setLoading(false); return; }
+
+      // Build a quick lookup from the in-memory products list
+      const localById = new Map(products.map(p => [p.id, p]));
+      // Also build a name-based lookup for fallback matching
+      const localByName = new Map<string, Product>();
+      for (const p of products) {
+        const key = p.name.toLowerCase().trim();
+        if (!localByName.has(key)) localByName.set(key, p);
+      }
+
+      // Collect product_ids that are NOT found in the local list
+      const missingIds = orderItems
+        .filter(oi => !localById.has(oi.product_id))
+        .map(oi => oi.product_id);
+
+      // Fetch missing products from Supabase by product_id + restaurant_id
+      let fetchedById = new Map<string, Product>();
+      if (missingIds.length > 0 && order.restaurant_id) {
+        const { data } = await supabase
+          .from('products')
+          .select('*, combo_groups(*, combo_group_items(*, combo_item_extras(*))), product_extras(*)')
+          .eq('restaurant_id', order.restaurant_id)
+          .eq('active', true)
+          .in('id', missingIds);
+        if (data) {
+          for (const p of data as Product[]) fetchedById.set(p.id, p);
+        }
+      }
+
+      const allProducts = new Map<string, Product>();
+      for (const [id, p] of localById) allProducts.set(id, p);
+      for (const [id, p] of fetchedById) allProducts.set(id, p);
+
+      const rebuilt: CartItem[] = [];
+      const missing: string[] = [];
+
+      for (const oi of orderItems) {
+        let product = allProducts.get(oi.product_id);
+        // Fallback: match by product name if ID not found
+        if (!product && oi.product_name) {
+          const nameKey = oi.product_name.toLowerCase().trim();
+          product = localByName.get(nameKey);
+        }
+        if (!product) {
+          missing.push(oi.product_name);
+          continue;
+        }
+        rebuilt.push({
+          cartId: crypto.randomUUID(),
+          product,
+          quantity: oi.quantity,
+          comboSelections: (oi.customizations?.combos ?? []).map((c: { groupName: string; items: { name: string; qty: number; observations?: string | null }[] }) => ({
+            groupId: '', groupName: c.groupName,
+            items: c.items.map((i: { name: string; qty: number; observations?: string | null }) => ({
+              id: '', name: i.name, qty: i.qty, priceDelta: 0, observations: i.observations ?? null,
+            })),
+          })),
+          extraSelections: (oi.customizations?.extras ?? []).map((e: { name: string; price: number; qty: number }) => ({
+            extraId: '', name: e.name, price: e.price, qty: e.qty,
+          })),
+          meioAMeioSelection: oi.customizations?.meio_a_meio ?? undefined,
+          itemTotal: oi.unit_price,
+          observations: oi.customizations?.observations ?? undefined,
+        });
+      }
+
+      setItems(rebuilt);
+      setMissingNames(missing);
+      setLoading(false);
+    })();
+  }, [order.id]);
 
   function updateQty(cartId: string, delta: number) {
     setItems(prev => prev.map(i =>
@@ -90,14 +142,19 @@ export default function ReorderReviewModal({ order, products, onConfirm, onClose
           <div className="mx-5 mt-4 flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2.5">
             <AlertCircle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
             <p className="text-xs text-amber-700">
-              {missingNames.length} item(ns) do pedido original não estão mais disponíveis no cardápio e foram removidos: {missingNames.join(', ')}.
+              Alguns itens antigos não estão mais disponíveis e foram ignorados: {missingNames.join(', ')}.
             </p>
           </div>
         )}
 
         {/* Items list */}
         <div className="overflow-y-auto flex-1 px-5 py-4 space-y-3">
-          {items.length === 0 ? (
+          {loading ? (
+            <div className="text-center py-12">
+              <Loader2 className="w-8 h-8 mx-auto mb-3 text-amber-500 animate-spin" />
+              <p className="text-sm text-gray-400">Buscando produtos do cardápio...</p>
+            </div>
+          ) : items.length === 0 ? (
             <div className="text-center py-12 text-gray-400">
               <ShoppingBag className="w-10 h-10 mx-auto mb-3 opacity-30" />
               <p className="text-sm font-medium">Nenhum item disponível para refazer</p>

@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
-import { X, Minus, Plus, Trash2, ShoppingBag, Truck, Star, Phone, Check, Gift, Coins, Percent, Trophy, MapPin, CreditCard, Banknote, QrCode, ChevronRight, AlertTriangle, Loader2, Search as SearchIcon, User, Home, Briefcase, Bookmark } from 'lucide-react';
-import { CartItem, LoyaltyConfig, LoyaltyReward, LoyaltyCustomer, RestaurantSettings, DeliveryKmZone, DeliveryOrderMode, DeliveryPaymentMethod, SavedAddress } from '../../types';
+import { X, Minus, Plus, Trash2, ShoppingBag, Truck, Star, Phone, Check, Gift, Coins, Percent, Trophy, MapPin, CreditCard, Banknote, QrCode, ChevronRight, AlertTriangle, Loader2, Search as SearchIcon, User, Home, Briefcase, Bookmark, Lock } from 'lucide-react';
+import { CartItem, LoyaltyConfig, LoyaltyReward, LoyaltyCustomer, RestaurantSettings, DeliveryKmZone, DeliveryOrderMode, DeliveryPaymentMethod, SavedAddress, RestaurantPayments } from '../../types';
 import { lookupCep as fetchCep } from '../../lib/cep';
 import { supabase } from '../../lib/supabase';
 
@@ -42,7 +42,14 @@ interface Props {
   onRemove: (cartId: string) => void;
   onOpenLoyalty: () => void;
   onClearLoyalty: () => void;
-  onCheckout: (cashbackUsed: number) => void;
+  onCheckout: (cashbackUsed: number, isOnlinePayment: boolean) => void;
+  onOnlinePaid?: (createdOrderId: string) => void;
+  pendingOrderId?: string | null;
+  onSetPendingOrderId?: (id: string | null) => void;
+  showOnlinePay?: boolean;
+  onSetShowOnlinePay?: (show: boolean) => void;
+  onlinePayMethod?: 'pix' | 'card' | null;
+  onSetOnlinePayMethod?: (method: 'pix' | 'card' | null) => void;
   placing: boolean;
   checkoutError?: string;
 }
@@ -70,6 +77,9 @@ export default function CartDrawer({
   deliveryInfo, onDeliveryChange, forceDelivery = false,
   onClose, onUpdateQty, onRemove, onOpenLoyalty, onClearLoyalty, onCheckout,
   placing, checkoutError = '',
+  onOnlinePaid, pendingOrderId: extPendingOrderId, onSetPendingOrderId,
+  showOnlinePay: extShowOnlinePay, onSetShowOnlinePay,
+  onlinePayMethod: extOnlinePayMethod, onSetOnlinePayMethod,
 }: Props) {
   const deliveryEnabled = (settings?.delivery_enabled ?? false) || forceDelivery;
   const canToggleMode = deliveryEnabled && !forceDelivery;
@@ -87,6 +97,7 @@ export default function CartDrawer({
   const [cashbackApplied, setCashbackApplied] = useState(0);
   const [savedAddresses, setSavedAddresses] = useState<SavedAddress[]>([]);
   const [showAddrPicker, setShowAddrPicker] = useState(false);
+  const [payConfig, setPayConfig] = useState<RestaurantPayments | null>(null);
 
   const fetchSavedAddresses = useCallback(async (phone: string) => {
     if (!restaurantId || phone.length < 10) { setSavedAddresses([]); return; }
@@ -103,10 +114,26 @@ export default function CartDrawer({
   useEffect(() => {
     if (deliveryInfo.mode === 'delivery' && deliveryInfo.whatsapp.length >= 10) {
       fetchSavedAddresses(deliveryInfo.whatsapp);
+      // Auto-fill customer profile when WhatsApp is entered — no need to click the search button
+      if (!customerFound && !customerLoading) {
+        autoLookupCustomer();
+      }
     } else {
       setSavedAddresses([]);
     }
   }, [deliveryInfo.whatsapp, deliveryInfo.mode, fetchSavedAddresses]);
+
+  useEffect(() => {
+    if (!restaurantId) return;
+    supabase
+      .from('restaurant_payments')
+      .select('*')
+      .eq('restaurant_id', restaurantId)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (data) setPayConfig(data as RestaurantPayments);
+      });
+  }, [restaurantId]);
 
   function selectSavedAddress(addr: SavedAddress) {
     update({
@@ -208,6 +235,59 @@ export default function CartDrawer({
     } catch { /* ignore */ } finally { setCustomerLoading(false); }
   }
 
+  async function autoLookupCustomer() {
+    if (!restaurantId || deliveryInfo.whatsapp.length < 10) return;
+    setCustomerLoading(true);
+    setCustomerFound(false);
+    try {
+      const { data: profile } = await supabase
+        .from('delivery_customer_profiles')
+        .select('name, cep, street, number, bairro, complement, reference, lat, lng')
+        .eq('restaurant_id', restaurantId)
+        .eq('phone', deliveryInfo.whatsapp)
+        .maybeSingle();
+
+      if (profile) {
+        update({
+          name: profile.name ?? deliveryInfo.name,
+          cep: profile.cep ?? deliveryInfo.cep,
+          street: profile.street ?? deliveryInfo.street,
+          number: profile.number ?? deliveryInfo.number,
+          bairro: profile.bairro ?? deliveryInfo.bairro,
+          complement: profile.complement ?? deliveryInfo.complement,
+          reference: profile.reference ?? deliveryInfo.reference,
+          lat: profile.lat ?? deliveryInfo.lat,
+          lng: profile.lng ?? deliveryInfo.lng,
+        });
+        setCustomerFound(true);
+        return;
+      }
+
+      const { data: recentOrder } = await supabase
+        .from('orders')
+        .select('delivery_name, delivery_cep, delivery_street, delivery_number, delivery_bairro, delivery_complement, delivery_reference')
+        .eq('restaurant_id', restaurantId)
+        .eq('delivery_mode', 'delivery')
+        .eq('delivery_whatsapp', deliveryInfo.whatsapp)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (recentOrder) {
+        update({
+          name: recentOrder.delivery_name ?? deliveryInfo.name,
+          cep: recentOrder.delivery_cep ?? deliveryInfo.cep,
+          street: recentOrder.delivery_street ?? deliveryInfo.street,
+          number: recentOrder.delivery_number ?? deliveryInfo.number,
+          bairro: recentOrder.delivery_bairro ?? deliveryInfo.bairro,
+          complement: recentOrder.delivery_complement ?? deliveryInfo.complement,
+          reference: recentOrder.delivery_reference ?? deliveryInfo.reference,
+        });
+        setCustomerFound(true);
+      }
+    } catch { /* ignore */ } finally { setCustomerLoading(false); }
+  }
+
   async function geocodeAndCalcDistance() {
     if (!deliveryInfo.street || !deliveryInfo.number || !deliveryInfo.bairro) return;
     if (originLat === null || originLng === null) return;
@@ -257,10 +337,24 @@ export default function CartDrawer({
 
   const canCheckout = items.length > 0 && deliveryFormValid && !placing;
 
+  function handleCheckout(cashbackUsed: number) {
+    if (onlinePaymentActive && (deliveryInfo.paymentMethod === 'online_pix' || deliveryInfo.paymentMethod === 'online_card')) {
+      onCheckout(cashbackUsed, true);
+    } else {
+      onCheckout(cashbackUsed, false);
+    }
+  }
+
   const paymentOptions: { value: DeliveryPaymentMethod; label: string; icon: React.ReactNode }[] = [
     { value: 'card_delivery', label: 'Cartão na Entrega', icon: <CreditCard className="w-4 h-4" /> },
     { value: 'pix_delivery', label: 'Pix na Entrega', icon: <QrCode className="w-4 h-4" /> },
     { value: 'cash_delivery', label: 'Dinheiro', icon: <Banknote className="w-4 h-4" /> },
+  ];
+
+  const onlinePaymentActive = payConfig?.online_payment_active ?? false;
+  const onlinePaymentOptions = [
+    ...(payConfig?.allow_pix ? [{ value: 'online_pix' as const, label: 'Pix Antecipado', icon: <QrCode className="w-4 h-4" /> }]: []),
+    ...(payConfig?.allow_credit_card ? [{ value: 'online_card' as const, label: 'Cartão Antecipado', icon: <CreditCard className="w-4 h-4" /> }]: []),
   ];
 
   return (
@@ -373,16 +467,9 @@ export default function CartDrawer({
                 </div>
               )}
 
-              <div className="grid grid-cols-2 gap-2">
-                <div className="col-span-2">
-                  <input
-                    className={inputCls}
-                    placeholder="Seu nome completo *"
-                    value={deliveryInfo.name}
-                    onChange={e => update({ name: e.target.value })}
-                  />
-                </div>
-                <div className="col-span-2 flex gap-2">
+              <div className="space-y-2">
+                {/* Telefone em primeiro lugar com botão Buscar endereço */}
+                <div className="flex gap-2">
                   <input
                     className={`${inputCls} flex-1`}
                     placeholder="WhatsApp (com DDD) *"
@@ -391,16 +478,24 @@ export default function CartDrawer({
                     onChange={e => update({ whatsapp: e.target.value })}
                   />
                   <button type="button" onClick={lookupCustomer}
-                    className="w-11 h-11 shrink-0 rounded-xl bg-amber-500 hover:bg-amber-400 flex items-center justify-center transition-colors"
-                    title="Buscar cliente">
-                    {customerLoading ? <Loader2 className="w-4 h-4 text-white animate-spin" /> : <SearchIcon className="w-4 h-4 text-white" />}
+                    className="flex items-center gap-1.5 shrink-0 px-4 rounded-xl bg-amber-500 hover:bg-amber-400 text-white text-sm font-semibold transition-colors whitespace-nowrap"
+                    title="Buscar endereço cadastrado">
+                    {customerLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <SearchIcon className="w-4 h-4" />}
+                    <span className="hidden sm:inline">Buscar endereço</span>
+                    <span className="sm:hidden">Buscar</span>
                   </button>
                 </div>
                 {customerFound && (
-                  <p className="col-span-2 text-xs text-green-600 flex items-center gap-1 -mt-1">
+                  <p className="text-xs text-green-600 flex items-center gap-1">
                     <User className="w-3 h-3" /> Cliente encontrado — dados preenchidos automaticamente
                   </p>
                 )}
+                <input
+                  className={inputCls}
+                  placeholder="Seu nome completo *"
+                  value={deliveryInfo.name}
+                  onChange={e => update({ name: e.target.value })}
+                />
                 <div className="relative">
                   <input
                     className={inputCls}
@@ -421,40 +516,32 @@ export default function CartDrawer({
                   onChange={e => update({ number: e.target.value })}
                   onBlur={handleAddressBlur}
                 />
-                <div className="col-span-2">
-                  <input
-                    className={inputCls}
-                    placeholder="Rua / Logradouro *"
-                    value={deliveryInfo.street}
-                    onChange={e => update({ street: e.target.value })}
-                    onBlur={handleAddressBlur}
-                  />
-                </div>
-                <div className="col-span-2">
-                  <input
-                    className={inputCls}
-                    placeholder="Bairro *"
-                    value={deliveryInfo.bairro}
-                    onChange={e => update({ bairro: e.target.value })}
-                    onBlur={handleAddressBlur}
-                  />
-                </div>
-                <div className="col-span-2">
-                  <input
-                    className={inputCls}
-                    placeholder="Complemento (opcional)"
-                    value={deliveryInfo.complement}
-                    onChange={e => update({ complement: e.target.value })}
-                  />
-                </div>
-                <div className="col-span-2">
-                  <input
-                    className={inputCls}
-                    placeholder="Ponto de referência (opcional)"
-                    value={deliveryInfo.reference}
-                    onChange={e => update({ reference: e.target.value })}
-                  />
-                </div>
+                <input
+                  className={inputCls}
+                  placeholder="Rua / Logradouro *"
+                  value={deliveryInfo.street}
+                  onChange={e => update({ street: e.target.value })}
+                  onBlur={handleAddressBlur}
+                />
+                <input
+                  className={inputCls}
+                  placeholder="Bairro *"
+                  value={deliveryInfo.bairro}
+                  onChange={e => update({ bairro: e.target.value })}
+                  onBlur={handleAddressBlur}
+                />
+                <input
+                  className={inputCls}
+                  placeholder="Complemento (opcional)"
+                  value={deliveryInfo.complement}
+                  onChange={e => update({ complement: e.target.value })}
+                />
+                <input
+                  className={inputCls}
+                  placeholder="Ponto de referência (opcional)"
+                  value={deliveryInfo.reference}
+                  onChange={e => update({ reference: e.target.value })}
+                />
               </div>
 
               {/* Distance + fee feedback */}
@@ -519,6 +606,34 @@ export default function CartDrawer({
                   </div>
                 )}
               </div>
+
+              {/* Online payment options */}
+              {onlinePaymentActive && onlinePaymentOptions.length > 0 && (
+                <div className="space-y-2 pt-1 mt-3 border-t border-amber-100">
+                  <p className="text-xs font-semibold text-cyan-600 uppercase tracking-wide flex items-center gap-1.5 pt-2">
+                    <Lock className="w-3.5 h-3.5" /> Pagamento Antecipado Online
+                  </p>
+                  <div className="space-y-1.5">
+                    {onlinePaymentOptions.map(opt => (
+                      <button
+                        key={opt.value}
+                        onClick={() => update({ paymentMethod: opt.value })}
+                        className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl border text-sm font-medium transition-all ${
+                          deliveryInfo.paymentMethod === opt.value
+                            ? 'border-cyan-400 bg-cyan-50 text-cyan-700'
+                            : 'border-gray-200 bg-white text-gray-700 hover:border-gray-300'
+                        }`}
+                      >
+                        <span className={deliveryInfo.paymentMethod === opt.value ? 'text-cyan-500' : 'text-gray-400'}>
+                          {opt.icon}
+                        </span>
+                        {opt.label}
+                        {deliveryInfo.paymentMethod === opt.value && <Check className="w-4 h-4 text-cyan-500 ml-auto" />}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
@@ -729,10 +844,10 @@ export default function CartDrawer({
             </div>
             <button
               disabled={!canCheckout}
-              onClick={() => onCheckout(effectiveCashbackDiscount)}
+              onClick={() => handleCheckout(effectiveCashbackDiscount)}
               className="w-full bg-amber-500 hover:bg-amber-400 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold py-4 rounded-2xl transition-colors text-base"
             >
-              {placing ? 'Enviando pedido...' : 'Finalizar Pedido'}
+              {placing ? 'Enviando pedido...' : deliveryInfo.paymentMethod === 'online_pix' || deliveryInfo.paymentMethod === 'online_card' ? 'Pagar Online e Finalizar' : 'Finalizar Pedido'}
             </button>
             {checkoutError && (
               <p className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-xl px-3 py-2.5 text-center">{checkoutError}</p>

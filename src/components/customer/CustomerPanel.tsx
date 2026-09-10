@@ -5,9 +5,11 @@ import { supabase, sortProductComboGroups } from '../../lib/supabase';
 import { useTenant } from '../../lib/tenant-context';
 import { Product, Category, RestaurantSettings, CartItem, CartComboSelection, CartExtraSelection, LoyaltyConfig, LoyaltyCustomer, LoyaltyReward, Order } from '../../types';
 import { isCurrentlyOpen, getTodayHours, formatShifts } from '../../lib/business-hours';
+import { lookupCep } from '../../lib/cep';
 import { DeliveryInfo } from './CartDrawer';
 import ProductDrawer from './ProductDrawer';
 import CartDrawer from './CartDrawer';
+import OnlinePaymentModal from './OnlinePaymentModal';
 import OrderTracking from './OrderTracking';
 import WaiterCallModal from './WaiterCallModal';
 import LoyaltyBenefitsModal from './LoyaltyBenefitsModal';
@@ -44,9 +46,16 @@ export default function CustomerPanel({ forceDelivery = false }: { forceDelivery
     paymentMethod: 'card_delivery', changeFor: '',
   });
   const [currentOrderId, setCurrentOrderId] = useState<string | null>(null);
+  const [pendingOnlineOrderId, setPendingOnlineOrderId] = useState<string | null>(null);
+  const [showOnlinePayment, setShowOnlinePayment] = useState(false);
+  const [onlinePayMethod, setOnlinePayMethod] = useState<'pix' | 'card' | null>(null);
   const [customerTab, setCustomerTab] = useState<'menu' | 'orders' | 'profile'>('menu');
   const [myOrders, setMyOrders] = useState<Order[]>([]);
   const [myProfile, setMyProfile] = useState<{ name: string; phone: string; cep: string; street: string; number: string; bairro: string; complement: string; reference: string } | null>(null);
+  const [editProfile, setEditProfile] = useState<{ name: string; phone: string; cep: string; street: string; number: string; bairro: string; complement: string; reference: string } | null>(null);
+  const [savingProfile, setSavingProfile] = useState(false);
+  const [profileSaved, setProfileSaved] = useState(false);
+  const [profileLookupPhone, setProfileLookupPhone] = useState('');
   const [loyaltyAuthUserId, setLoyaltyAuthUserId] = useState<string | null>(null);
   const [authChecked, setAuthChecked] = useState(false);
   const categoryRefs = useRef<Record<string, HTMLElement | null>>({});
@@ -252,7 +261,7 @@ export default function CustomerPanel({ forceDelivery = false }: { forceDelivery
     setLoyaltyDiscount(0);
   }
 
-  async function checkout(cashbackUsed: number) {
+  async function checkout(cashbackUsed: number, isOnlinePayment = false) {
     if (cart.length === 0) return;
     if (isPaused) {
       setCheckoutError(`Estamos com alta demanda! Voltamos a aceitar pedidos às ${pausedUntilStr}.`);
@@ -318,35 +327,27 @@ export default function CustomerPanel({ forceDelivery = false }: { forceDelivery
         delivery_status: 'pending',
       } : { delivery_mode: 'pickup' };
 
-      const { data: orderData, error: orderErr } = await supabase
-        .from('orders')
-        .insert({
-          table_number: isDelivery ? 'Delivery' : tableNumber,
-          service_mode: serviceMode,
-          total,
-          ...deliveryFields,
-          ...(restaurantId ? { restaurant_id: restaurantId } : {}),
-          ...(loyaltyActive ? {
-            loyalty_customer_phone: loyaltyIdentifier,
-            loyalty_customer_name: loyaltyName || loyaltyCustomer?.nome || null,
-            loyalty_reward_id: selectedReward?.id ?? null,
-            loyalty_discount: loyaltyDiscount + cashbackUsed,
-            loyalty_benefit_action: selectedReward ? 'pending' : 'none',
-            loyalty_points_earned: loyaltyPoints,
-            loyalty_cashback_earned: loyaltyCashback,
-            loyalty_points_total: loyaltyPointsTotal,
-            loyalty_cashback_total: loyaltyCashbackTotal,
-          } : {}),
-        })
-        .select()
-        .maybeSingle();
-      if (orderErr || !orderData) {
-        setCheckoutError('Erro ao registrar pedido. Tente novamente.');
-        return;
-      }
+      // Build order payload (used for both PIX insert and card edge function)
+      const orderPayload: Record<string, unknown> = {
+        table_number: isDelivery ? 'Delivery' : tableNumber,
+        service_mode: serviceMode,
+        total,
+        ...deliveryFields,
+        ...(restaurantId ? { restaurant_id: restaurantId } : {}),
+        ...(loyaltyActive ? {
+          loyalty_customer_phone: loyaltyIdentifier,
+          loyalty_customer_name: loyaltyName || loyaltyCustomer?.nome || null,
+          loyalty_reward_id: selectedReward?.id ?? null,
+          loyalty_discount: loyaltyDiscount + cashbackUsed,
+          loyalty_benefit_action: selectedReward ? 'pending' : 'none',
+          loyalty_points_earned: loyaltyPoints,
+          loyalty_cashback_earned: loyaltyCashback,
+          loyalty_points_total: loyaltyPointsTotal,
+          loyalty_cashback_total: loyaltyCashbackTotal,
+        } : {}),
+      };
 
-      const items = cart.map(ci => ({
-        order_id: orderData.id,
+      const itemsPayload = cart.map(ci => ({
         product_id: ci.product.id,
         product_name: ci.product.name,
         quantity: ci.quantity,
@@ -366,6 +367,38 @@ export default function CustomerPanel({ forceDelivery = false }: { forceDelivery
           ...(ci.observations ? { observations: ci.observations } : {}),
         },
       }));
+
+      // ── Card payment: do NOT create order in DB — edge function creates it on approval ──
+      if (isOnlinePayment && deliveryInfo.paymentMethod === 'online_card') {
+        const pendingId = crypto.randomUUID();
+        setPendingOnlineOrderId(pendingId);
+        setOnlinePayMethod('card');
+        setShowOnlinePayment(true);
+        setPlacingOrder(false);
+        // Pass order data to the payment modal — order is created only if card is approved
+        (window as Record<string, unknown>).__pendingOrderData = {
+          orderPayload: { ...orderPayload, payment_status: 'pending', payment_method: 'online_card' },
+          itemsPayload,
+        };
+        return;
+      }
+
+      // ── PIX payment: create order in DB first (PIX is async — webhook updates later) ──
+      // ── Non-online: create order immediately ──
+      const { data: orderData, error: orderErr } = await supabase
+        .from('orders')
+        .insert({
+          ...orderPayload,
+          ...(isOnlinePayment ? { payment_status: 'pending', payment_method: 'online_pix' } : {}),
+        })
+        .select()
+        .maybeSingle();
+      if (orderErr || !orderData) {
+        setCheckoutError('Erro ao registrar pedido. Tente novamente.');
+        return;
+      }
+
+      const items = itemsPayload.map(ci => ({ ...ci, order_id: orderData.id }));
       await supabase.from('order_items').insert(items);
 
       if (serviceMode === 'table') {
@@ -382,20 +415,25 @@ export default function CustomerPanel({ forceDelivery = false }: { forceDelivery
         await creditLoyalty(total, loyaltyPoints, loyaltyCashback, cashbackUsed);
       }
 
-      // Save delivery customer profile for future lookups (delivery orders only — needs address)
-      if (isDelivery && restaurantId && deliveryInfo.whatsapp) {
+      // Auto-save customer profile for ALL order types (delivery + pickup)
+      // so name/phone/address are pre-filled on the next order
+      const profilePhone = isDelivery ? deliveryInfo.whatsapp : loyaltyPhone;
+      const profileName = isDelivery ? deliveryInfo.name : (loyaltyName || loyaltyCustomer?.nome || null);
+      if (restaurantId && profilePhone) {
         await supabase.from('delivery_customer_profiles').upsert({
           restaurant_id: restaurantId,
-          phone: deliveryInfo.whatsapp,
-          name: deliveryInfo.name || null,
-          cep: deliveryInfo.cep || null,
-          street: deliveryInfo.street || null,
-          number: deliveryInfo.number || null,
-          bairro: deliveryInfo.bairro || null,
-          complement: deliveryInfo.complement || null,
-          reference: deliveryInfo.reference || null,
-          lat: deliveryInfo.lat,
-          lng: deliveryInfo.lng,
+          phone: profilePhone,
+          name: profileName || null,
+          ...(isDelivery ? {
+            cep: deliveryInfo.cep || null,
+            street: deliveryInfo.street || null,
+            number: deliveryInfo.number || null,
+            bairro: deliveryInfo.bairro || null,
+            complement: deliveryInfo.complement || null,
+            reference: deliveryInfo.reference || null,
+            lat: deliveryInfo.lat,
+            lng: deliveryInfo.lng,
+          } : {}),
           updated_at: new Date().toISOString(),
         }, { onConflict: 'restaurant_id,phone' });
       }
@@ -405,6 +443,15 @@ export default function CustomerPanel({ forceDelivery = false }: { forceDelivery
         try {
           await navigator.serviceWorker.register('/sw.js');
         } catch { /* ignore */ }
+      }
+
+      // If PIX online payment, show payment modal instead of completing
+      if (isOnlinePayment && deliveryInfo.paymentMethod === 'online_pix') {
+        setPendingOnlineOrderId(orderData.id);
+        setOnlinePayMethod('pix');
+        setShowOnlinePayment(true);
+        setPlacingOrder(false);
+        return;
       }
 
       setCart([]);
@@ -537,6 +584,18 @@ export default function CustomerPanel({ forceDelivery = false }: { forceDelivery
     setMyOrders((data ?? []) as Order[]);
   }
 
+  // Realtime subscription for customer orders — keeps "Meus Pedidos" live
+  useEffect(() => {
+    if (customerTab !== 'orders') return;
+    fetchMyOrders();
+    const ch = supabase
+      .channel('customer-orders-realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, fetchMyOrders)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'order_items' }, fetchMyOrders)
+      .subscribe();
+    return () => { supabase.removeChannel(ch); };
+  }, [customerTab, loyaltyPhone, deliveryInfo.whatsapp, restaurantId]);
+
   async function fetchMyProfile() {
     if (!restaurantId) return;
     const phone = loyaltyPhone || deliveryInfo.whatsapp;
@@ -561,20 +620,26 @@ export default function CustomerPanel({ forceDelivery = false }: { forceDelivery
 
     // Fall back to loyalty_customers for name/phone if no delivery profile
     if (loyaltyCustomer) {
+      // Use loyaltyCustomer.phone only if it looks like a phone (not an email)
+      const lcPhone = loyaltyCustomer.phone && !loyaltyCustomer.phone.includes('@') ? loyaltyCustomer.phone : phone;
       setMyProfile({
-        name: loyaltyCustomer.nome ?? '', phone: loyaltyCustomer.phone ?? phone,
+        name: loyaltyCustomer.nome ?? '', phone: lcPhone,
         cep: '', street: '', number: '', bairro: '', complement: '', reference: '',
       });
       return;
     }
 
-    setMyProfile(null);
+    // No profile found — keep form visible with the phone pre-filled
+    setMyProfile({ name: '', phone, cep: '', street: '', number: '', bairro: '', complement: '', reference: '' });
   }
 
   useEffect(() => {
-    if (customerTab === 'orders') fetchMyOrders();
     if (customerTab === 'profile') fetchMyProfile();
   }, [customerTab, loyaltyPhone, deliveryInfo.whatsapp, loyaltyCustomer]);
+
+  useEffect(() => {
+    if (myProfile) setEditProfile({ ...myProfile });
+  }, [myProfile]);
 
   function repeatOrder(order: Order) {
     setReorderOrder(order);
@@ -588,12 +653,40 @@ export default function CustomerPanel({ forceDelivery = false }: { forceDelivery
     setShowCart(true);
   }
 
+  async function saveProfile() {
+    if (!editProfile || !restaurantId) return;
+    setSavingProfile(true);
+    setProfileSaved(false);
+    const phone = editProfile.phone || loyaltyPhone || deliveryInfo.whatsapp;
+    if (!phone) {
+      setSavingProfile(false);
+      return;
+    }
+    await supabase.from('delivery_customer_profiles').upsert({
+      restaurant_id: restaurantId,
+      phone,
+      name: editProfile.name || null,
+      cep: editProfile.cep || null,
+      street: editProfile.street || null,
+      number: editProfile.number || null,
+      bairro: editProfile.bairro || null,
+      complement: editProfile.complement || null,
+      reference: editProfile.reference || null,
+      updated_at: new Date().toISOString(),
+    }, { onConflict: 'restaurant_id,phone' });
+    setMyProfile({ ...editProfile, phone });
+    setSavingProfile(false);
+    setProfileSaved(true);
+    setTimeout(() => setProfileSaved(false), 3000);
+  }
+
   if (currentOrderId) {
     return (
       <OrderTracking
         orderId={currentOrderId}
         tableNumber={tableNumber}
         serviceMode={settings?.service_mode ?? 'table'}
+        onClose={() => setCurrentOrderId(null)}
       />
     );
   }
@@ -858,11 +951,15 @@ export default function CustomerPanel({ forceDelivery = false }: { forceDelivery
                         </p>
                       </div>
                       <span className={'text-xs font-bold px-2 py-1 rounded-full ' + (
-                        o.delivery_mode === 'delivery'
+                        o.payment_status === 'pending' && o.payment_method?.startsWith('online_')
+                          ? 'bg-amber-500/20 text-amber-400'
+                          : o.delivery_mode === 'delivery'
                           ? (o.delivery_status === 'delivered' ? 'bg-green-500/20 text-green-400' : o.delivery_status === 'dispatched' ? 'bg-blue-500/20 text-blue-400' : 'bg-amber-500/20 text-amber-400')
                           : (o.status === 'closed' ? 'bg-green-500/20 text-green-400' : o.status === 'ready' ? 'bg-green-500/20 text-green-400' : 'bg-amber-500/20 text-amber-400')
                       )}>
-                        {o.delivery_mode === 'delivery'
+                        {o.payment_status === 'pending' && o.payment_method?.startsWith('online_')
+                          ? 'Aguardando Pagamento'
+                          : o.delivery_mode === 'delivery'
                           ? (o.delivery_status === 'delivered' ? 'Entregue' : o.delivery_status === 'dispatched' ? 'A caminho' : 'Em preparo')
                           : (o.status === 'closed' ? 'Finalizado' : o.status === 'ready' ? 'Pronto' : 'Em preparo')
                         }
@@ -902,55 +999,133 @@ export default function CustomerPanel({ forceDelivery = false }: { forceDelivery
                 <X className="w-4 h-4" />
               </button>
             </div>
-            {myProfile ? (
-              <>
-                <div className="bg-slate-900 rounded-2xl border border-slate-800 p-5 space-y-4">
-                  <div>
-                    <label className="text-xs text-slate-500 font-semibold uppercase">Nome</label>
-                    <p className="text-white text-sm mt-1">{myProfile.name || '—'}</p>
-                  </div>
-                  <div>
-                    <label className="text-xs text-slate-500 font-semibold uppercase flex items-center gap-1"><Phone className="w-3 h-3" /> Telefone</label>
-                    <p className="text-white text-sm mt-1">{myProfile.phone}</p>
-                  </div>
-                  {(myProfile.street || myProfile.bairro) && (
-                    <div className="pt-3 border-t border-slate-800">
-                      <label className="text-xs text-slate-500 font-semibold uppercase flex items-center gap-1"><MapPin className="w-3 h-3" /> Endereço de Entrega</label>
-                      <div className="mt-2 space-y-1 text-sm text-slate-300">
-                        <p>{myProfile.street}, {myProfile.number}</p>
-                        <p>{myProfile.bairro}{myProfile.cep ? ' - CEP ' + myProfile.cep : ''}</p>
-                        {myProfile.complement && <p className="text-slate-500">Complemento: {myProfile.complement}</p>}
-                        {myProfile.reference && <p className="text-slate-500">Referência: {myProfile.reference}</p>}
-                      </div>
-                    </div>
-                  )}
-                  {loyaltyCustomer && loyaltyConfig && (
-                    <div className="pt-3 border-t border-slate-800">
-                      <label className="text-xs text-slate-500 font-semibold uppercase flex items-center gap-1"><Trophy className="w-3 h-3" /> Fidelidade</label>
-                      <div className="mt-2 flex gap-2">
-                        {loyaltyConfig.tipo_promocao === 'pontos_por_real' ? (
-                          <span className="text-sm text-amber-400 font-bold">{loyaltyCustomer.saldo_pontos} pontos</span>
-                        ) : (
-                          <span className="text-sm text-green-400 font-bold">R$ {Number(loyaltyCustomer.saldo_cashback).toFixed(2)} cashback</span>
-                        )}
-                      </div>
-                    </div>
+            <div className="bg-slate-900 rounded-2xl border border-slate-800 p-5 space-y-4">
+              {/* Nome */}
+              <div>
+                <label className="text-xs text-slate-500 font-semibold uppercase">Nome</label>
+                <input
+                  value={editProfile?.name ?? myProfile?.name ?? ''}
+                  onChange={e => setEditProfile(prev => prev ? { ...prev, name: e.target.value } : { name: e.target.value, phone: myProfile?.phone ?? profileLookupPhone ?? '', cep: myProfile?.cep ?? '', street: myProfile?.street ?? '', number: myProfile?.number ?? '', bairro: myProfile?.bairro ?? '', complement: myProfile?.complement ?? '', reference: myProfile?.reference ?? '' })}
+                  placeholder="Seu nome"
+                  className="w-full mt-1 bg-slate-800 border border-slate-700 rounded-xl px-3 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-amber-500"
+                />
+              </div>
+              {/* Telefone */}
+              <div>
+                <label className="text-xs text-slate-500 font-semibold uppercase flex items-center gap-1"><Phone className="w-3 h-3" /> Telefone</label>
+                <div className="flex gap-2 mt-1">
+                  <input
+                    type="tel"
+                    value={editProfile?.phone ?? myProfile?.phone ?? profileLookupPhone}
+                    onChange={e => {
+                      const val = e.target.value;
+                      setProfileLookupPhone(val);
+                      setEditProfile(prev => prev ? { ...prev, phone: val } : { name: myProfile?.name ?? '', phone: val, cep: myProfile?.cep ?? '', street: myProfile?.street ?? '', number: myProfile?.number ?? '', bairro: myProfile?.bairro ?? '', complement: myProfile?.complement ?? '', reference: myProfile?.reference ?? '' });
+                    }}
+                    onKeyDown={e => { if (e.key === 'Enter' && (editProfile?.phone ?? profileLookupPhone).length >= 10) { setDeliveryInfo(prev => ({ ...prev, whatsapp: editProfile?.phone ?? profileLookupPhone })); setLoyaltyPhone(editProfile?.phone ?? profileLookupPhone); } }}
+                    placeholder="(11) 99999-9999"
+                    className="flex-1 bg-slate-800 border border-slate-700 rounded-xl px-3 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-amber-500"
+                  />
+                  {!myProfile && (
+                    <button
+                      onClick={() => {
+                        const phone = editProfile?.phone ?? profileLookupPhone;
+                        if (phone.length < 10) return;
+                        setDeliveryInfo(prev => ({ ...prev, whatsapp: phone }));
+                        setLoyaltyPhone(phone);
+                      }}
+                      disabled={(editProfile?.phone ?? profileLookupPhone).length < 10}
+                      className="shrink-0 px-4 rounded-xl bg-amber-500 hover:bg-amber-400 disabled:opacity-50 text-black font-bold text-sm transition-colors flex items-center gap-1.5"
+                    >
+                      <Search className="w-4 h-4" /> Buscar
+                    </button>
                   )}
                 </div>
-                {loyaltyCustomer && (
-                  <button
-                    onClick={handleLogout}
-                    className="w-full mt-4 flex items-center justify-center gap-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 hover:text-red-300 font-semibold py-3.5 rounded-xl border border-red-500/20 transition-colors text-sm"
-                  >
-                    <LogOut className="w-4 h-4" /> Sair da Conta
-                  </button>
-                )}
-              </>
-            ) : (
-              <div className="py-20 text-center text-slate-500">
-                <UserIcon className="w-12 h-12 mx-auto text-slate-700 mb-3" />
-                <p className="text-sm">Seus dados aparecerão aqui após seu primeiro pedido.</p>
               </div>
+              {/* Endereço */}
+              <div className="pt-3 border-t border-slate-800">
+                <label className="text-xs text-slate-500 font-semibold uppercase flex items-center gap-1"><MapPin className="w-3 h-3" /> Endereço de Entrega</label>
+                <div className="mt-2 space-y-2">
+                  <div className="grid grid-cols-3 gap-2">
+                    <input
+                      value={editProfile?.cep ?? myProfile?.cep ?? ''}
+                      onChange={e => {
+                        const val = e.target.value.replace(/\D/g, '').slice(0, 8);
+                        setEditProfile(prev => prev ? { ...prev, cep: val } : { name: myProfile?.name ?? '', phone: myProfile?.phone ?? profileLookupPhone, cep: val, street: myProfile?.street ?? '', number: myProfile?.number ?? '', bairro: myProfile?.bairro ?? '', complement: myProfile?.complement ?? '', reference: myProfile?.reference ?? '' });
+                        if (val.length === 8) {
+                          lookupCep(val).then(cepData => {
+                            if (cepData) {
+                              setEditProfile(prev => prev ? { ...prev, street: cepData.street ?? prev.street, bairro: cepData.bairro ?? prev.bairro } : null);
+                            }
+                          });
+                        }
+                      }}
+                      placeholder="CEP"
+                      className="col-span-1 bg-slate-800 border border-slate-700 rounded-xl px-3 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-amber-500"
+                    />
+                    <input
+                      value={editProfile?.street ?? myProfile?.street ?? ''}
+                      onChange={e => setEditProfile(prev => prev ? { ...prev, street: e.target.value } : { name: myProfile?.name ?? '', phone: myProfile?.phone ?? profileLookupPhone, cep: myProfile?.cep ?? '', street: e.target.value, number: myProfile?.number ?? '', bairro: myProfile?.bairro ?? '', complement: myProfile?.complement ?? '', reference: myProfile?.reference ?? '' })}
+                      placeholder="Rua"
+                      className="col-span-2 bg-slate-800 border border-slate-700 rounded-xl px-3 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-amber-500"
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <input
+                      value={editProfile?.number ?? myProfile?.number ?? ''}
+                      onChange={e => setEditProfile(prev => prev ? { ...prev, number: e.target.value } : { name: myProfile?.name ?? '', phone: myProfile?.phone ?? profileLookupPhone, cep: myProfile?.cep ?? '', street: myProfile?.street ?? '', number: e.target.value, bairro: myProfile?.bairro ?? '', complement: myProfile?.complement ?? '', reference: myProfile?.reference ?? '' })}
+                      placeholder="Número"
+                      className="bg-slate-800 border border-slate-700 rounded-xl px-3 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-amber-500"
+                    />
+                    <input
+                      value={editProfile?.bairro ?? myProfile?.bairro ?? ''}
+                      onChange={e => setEditProfile(prev => prev ? { ...prev, bairro: e.target.value } : { name: myProfile?.name ?? '', phone: myProfile?.phone ?? profileLookupPhone, cep: myProfile?.cep ?? '', street: myProfile?.street ?? '', number: myProfile?.number ?? '', bairro: e.target.value, complement: myProfile?.complement ?? '', reference: myProfile?.reference ?? '' })}
+                      placeholder="Bairro"
+                      className="bg-slate-800 border border-slate-700 rounded-xl px-3 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-amber-500"
+                    />
+                  </div>
+                  <input
+                    value={editProfile?.complement ?? myProfile?.complement ?? ''}
+                    onChange={e => setEditProfile(prev => prev ? { ...prev, complement: e.target.value } : { name: myProfile?.name ?? '', phone: myProfile?.phone ?? profileLookupPhone, cep: myProfile?.cep ?? '', street: myProfile?.street ?? '', number: myProfile?.number ?? '', bairro: myProfile?.bairro ?? '', complement: e.target.value, reference: myProfile?.reference ?? '' })}
+                    placeholder="Complemento (opcional)"
+                    className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-amber-500"
+                  />
+                  <input
+                    value={editProfile?.reference ?? myProfile?.reference ?? ''}
+                    onChange={e => setEditProfile(prev => prev ? { ...prev, reference: e.target.value } : { name: myProfile?.name ?? '', phone: myProfile?.phone ?? profileLookupPhone, cep: myProfile?.cep ?? '', street: myProfile?.street ?? '', number: myProfile?.number ?? '', bairro: myProfile?.bairro ?? '', complement: myProfile?.complement ?? '', reference: e.target.value })}
+                    placeholder="Ponto de referência (opcional)"
+                    className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-amber-500"
+                  />
+                </div>
+              </div>
+              {/* Save button */}
+              <button
+                onClick={saveProfile}
+                disabled={savingProfile}
+                className="w-full flex items-center justify-center gap-2 bg-amber-500 hover:bg-amber-400 disabled:opacity-50 text-black font-bold py-3 rounded-xl transition-colors text-sm"
+              >
+                {savingProfile ? 'Salvando...' : profileSaved ? 'Salvo!' : 'Salvar Dados'}
+              </button>
+              {loyaltyCustomer && loyaltyConfig && (
+                <div className="pt-3 border-t border-slate-800">
+                  <label className="text-xs text-slate-500 font-semibold uppercase flex items-center gap-1"><Trophy className="w-3 h-3" /> Fidelidade</label>
+                  <div className="mt-2 flex gap-2">
+                    {loyaltyConfig.tipo_promocao === 'pontos_por_real' ? (
+                      <span className="text-sm text-amber-400 font-bold">{loyaltyCustomer.saldo_pontos} pontos</span>
+                    ) : (
+                      <span className="text-sm text-green-400 font-bold">R$ {Number(loyaltyCustomer.saldo_cashback).toFixed(2)} cashback</span>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+            {loyaltyCustomer && (
+              <button
+                onClick={handleLogout}
+                className="w-full mt-4 flex items-center justify-center gap-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 hover:text-red-300 font-semibold py-3.5 rounded-xl border border-red-500/20 transition-colors text-sm"
+              >
+                <LogOut className="w-4 h-4" /> Sair da Conta
+              </button>
             )}
           </div>
         </div>
@@ -987,6 +1162,17 @@ export default function CustomerPanel({ forceDelivery = false }: { forceDelivery
           onCheckout={checkout}
           placing={placingOrder}
           checkoutError={checkoutError}
+          onOnlinePaid={(createdOrderId: string) => {
+            setCart([]);
+            setShowCart(false);
+            setCurrentOrderId(createdOrderId || pendingOnlineOrderId);
+            setPendingOnlineOrderId(null);
+            setShowOnlinePayment(false);
+          }}
+          pendingOrderId={pendingOnlineOrderId}
+          onSetPendingOrderId={setPendingOnlineOrderId}
+          onSetShowOnlinePay={setShowOnlinePayment}
+          onSetOnlinePayMethod={setOnlinePayMethod}
         />
       )}
 
@@ -1036,6 +1222,26 @@ export default function CustomerPanel({ forceDelivery = false }: { forceDelivery
           tableNumber={tableNumber}
           restaurantId={restaurantId}
           onClose={() => setShowWaiterCall(false)}
+        />
+      )}
+
+      {showOnlinePayment && pendingOnlineOrderId && onlinePayMethod && restaurantId && (
+        <OnlinePaymentModal
+          orderId={pendingOnlineOrderId}
+          amount={cart.reduce((s, i) => s + i.itemTotal * i.quantity, 0) + (deliveryInfo.mode === 'delivery' ? deliveryInfo.fee : 0) - loyaltyDiscount}
+          restaurantId={restaurantId}
+          paymentMethod={onlinePayMethod}
+          orderData={onlinePayMethod === 'card' ? ((window as Record<string, unknown>).__pendingOrderData as { orderPayload: Record<string, unknown> })?.orderPayload : undefined}
+          orderItems={onlinePayMethod === 'card' ? ((window as Record<string, unknown>).__pendingOrderData as { itemsPayload: Record<string, unknown>[] })?.itemsPayload : undefined}
+          onClose={() => { setShowOnlinePayment(false); setPendingOnlineOrderId(null); (window as Record<string, unknown>).__pendingOrderData = undefined; }}
+          onPaid={(createdOrderId: string) => {
+            setCart([]);
+            setShowCart(false);
+            setShowOnlinePayment(false);
+            setCurrentOrderId(createdOrderId || pendingOnlineOrderId);
+            setPendingOnlineOrderId(null);
+            (window as Record<string, unknown>).__pendingOrderData = undefined;
+          }}
         />
       )}
     </div>

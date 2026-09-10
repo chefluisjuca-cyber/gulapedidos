@@ -235,8 +235,21 @@ export interface DeliveryKmZone {
 }
 
 export type DeliveryOrderMode = 'pickup' | 'delivery';
-export type DeliveryPaymentMethod = 'counter' | 'card_delivery' | 'pix_delivery' | 'cash_delivery';
+export type DeliveryPaymentMethod = 'counter' | 'card_delivery' | 'pix_delivery' | 'cash_delivery' | 'online_pix' | 'online_card';
 export type DeliveryOrderStatus = 'pending' | 'preparing' | 'dispatched' | 'delivered';
+export type PaymentStatus = 'pending' | 'paid' | 'rejected' | 'refunded' | null;
+
+export interface RestaurantPayments {
+  id: string;
+  restaurant_id: string | null;
+  online_payment_active: boolean;
+  mp_access_token: string | null;
+  mp_public_key: string | null;
+  allow_pix: boolean;
+  allow_credit_card: boolean;
+  created_at: string;
+  updated_at: string;
+}
 
 export interface RestaurantSettings {
   id: string;
@@ -385,6 +398,9 @@ export interface Order {
   delivery_status: DeliveryOrderStatus;
   cancel_reason: string | null;
   payment_method: string | null;
+  payment_status: PaymentStatus;
+  mp_payment_id: number | null;
+  mp_payment_method: string | null;
   created_at: string;
   updated_at: string;
   order_items?: OrderItem[];
@@ -408,6 +424,16 @@ export interface OrderItem {
 }
 
 export type WaiterCallType = 'attention' | 'request' | 'bill';
+
+export interface OrderMessage {
+  id: string;
+  order_id: string;
+  restaurant_id: string | null;
+  sender_type: 'client' | 'restaurant';
+  message: string;
+  read: boolean;
+  created_at: string;
+}
 
 export interface WaiterCall {
   id: string;

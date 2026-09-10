@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Sparkles } from 'lucide-react';
+import { Sparkles, ArrowLeft } from 'lucide-react';
 import SoroBlogEmbed from './SoroBlogEmbed';
 
 export default function BlogListPage() {
@@ -16,6 +16,13 @@ export default function BlogListPage() {
           <Link to="/" className="flex items-center gap-2.5">
             <img src="/gula-pedidos-digial.png" alt="Gula Pedidos" className="w-8 h-8 object-contain" />
             <span className="font-bold text-slate-900">Gula Pedidos</span>
+          </Link>
+          <Link
+            to="/"
+            className="flex items-center gap-1.5 text-sm font-semibold text-slate-600 hover:text-slate-900 transition-colors"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            Voltar
           </Link>
           <Link
             to="/cadastrar"

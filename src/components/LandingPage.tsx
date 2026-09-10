@@ -884,7 +884,7 @@ export default function LandingPage() {
               Conteúdos práticos escritos por quem entende a rotina real de um restaurante.
             </p>
           </div>
-          <SoroBlogEmbed />
+          <SoroBlogEmbed maxPosts={3} />
         </div>
       </section>
 

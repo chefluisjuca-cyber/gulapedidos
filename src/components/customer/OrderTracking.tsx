@@ -1,12 +1,14 @@
 import { useState, useEffect, useRef } from 'react';
-import { Clock, ChefHat, CheckCircle, Package, MapPin, Bike, Home } from 'lucide-react';
+import { Clock, ChefHat, CheckCircle, Package, MapPin, Bike, Home, X, ArrowLeft } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { Order, OrderStatus, DeliveryOrderStatus } from '../../types';
+import OrderChat from './OrderChat';
 
 interface Props {
   orderId: string;
   tableNumber: string;
   serviceMode: 'table' | 'counter';
+  onClose?: () => void;
 }
 
 const STATUS_STEPS_TABLE: { key: OrderStatus; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
@@ -23,7 +25,7 @@ const STATUS_STEPS_DELIVERY: { key: string; label: string; icon: React.Component
   { key: 'delivered',  label: 'Entregue',          icon: Home },
 ];
 
-export default function OrderTracking({ orderId, tableNumber, serviceMode }: Props) {
+export default function OrderTracking({ orderId, tableNumber, serviceMode, onClose }: Props) {
   const [order, setOrder] = useState<Order | null>(null);
   const prevDeliveryStatusRef = useRef<string | null>(null);
   const prevStatusRef = useRef<OrderStatus | null>(null);
@@ -132,7 +134,16 @@ export default function OrderTracking({ orderId, tableNumber, serviceMode }: Pro
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
       {/* Status Banner */}
-      <div className={`px-5 py-10 text-center transition-colors ${bannerColor}`}>
+      <div className={`px-5 py-10 text-center transition-colors relative ${bannerColor}`}>
+        {onClose && (
+          <button
+            onClick={onClose}
+            className="absolute top-4 right-4 w-10 h-10 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center transition-colors"
+            title="Fechar"
+          >
+            <X className="w-5 h-5 text-white" />
+          </button>
+        )}
         <div className="w-16 h-16 rounded-full bg-white/20 flex items-center justify-center mx-auto mb-4">
           {bannerIcon}
         </div>
@@ -152,7 +163,13 @@ export default function OrderTracking({ orderId, tableNumber, serviceMode }: Pro
 
       {/* Message box */}
       <div className="mx-5 mt-5">
-        {order.status === 'pending' && !del && (
+        {order.payment_status === 'pending' && order.payment_method?.startsWith('online_') && (
+          <div className="bg-amber-50 border border-amber-300 rounded-2xl p-4 text-center">
+            <p className="text-amber-900 text-sm font-bold">Aguardando Pagamento</p>
+            <p className="text-amber-700 text-xs mt-1">Finalize o pagamento PIX para que o restaurante inicie o preparo.</p>
+          </div>
+        )}
+        {order.status === 'pending' && !del && order.payment_status !== 'pending' && (
           <div className="bg-yellow-50 border border-yellow-200 rounded-2xl p-4 text-center">
             <p className="text-yellow-800 text-sm font-medium">Aguardando confirmação da cozinha...</p>
           </div>
@@ -244,7 +261,22 @@ export default function OrderTracking({ orderId, tableNumber, serviceMode }: Pro
       </div>
 
       <div className="flex-1" />
+
+      {onClose && (
+        <div className="px-5 pb-6 pt-2">
+          <button
+            onClick={onClose}
+            className="w-full bg-amber-500 hover:bg-amber-400 text-white font-bold py-4 rounded-2xl transition-colors flex items-center justify-center gap-2 text-base"
+          >
+            <ArrowLeft className="w-5 h-5" />
+            Voltar para o Cardápio
+          </button>
+        </div>
+      )}
+
       <div className="h-8" />
+
+      {del && <OrderChat orderId={order.id} senderType="client" variant="floating" title="Chat com o Restaurante" />}
     </div>
   );
 }

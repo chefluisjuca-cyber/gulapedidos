@@ -150,6 +150,17 @@ function buildCouponHtml(orderSrc: Order, settings: RestaurantSettings | null, m
     }
     rows.push(`<div class="item-linha big"><span>TOTAL</span><span class="item-preco">${esc(fmt(order.total))}</span></div>`);
 
+    // Online payment details
+    const isOnlinePaid = order.payment_status === 'paid' && order.mp_payment_method;
+    if (isOnlinePaid) {
+      rows.push(SEPD);
+      const payLabel = order.mp_payment_method === 'pix' ? 'PIX' : 'CARTAO DE CREDITO';
+      rows.push(`<div class="item-linha"><span>PAGO ONLINE (${esc(payLabel)})</span><span class="item-preco">${esc(fmt(order.total))}</span></div>`);
+      rows.push(`<div class="item-linha big highlight"><span>TOTAL A COBRAR NO DESTINO</span><span class="item-preco">R$ 0,00</span></div>`);
+      if (order.mp_payment_id) rows.push(`<div class="center">TRANSACAO: #${esc(String(order.mp_payment_id))}</div>`);
+      rows.push(`<div class="center">FORMA DE PAGAMENTO: ONLINE ${esc(payLabel)}</div>`);
+    }
+
     const hasPts  = order.loyalty_points_earned > 0;
     const hasCash = Number(order.loyalty_cashback_earned) > 0;
     if (hasPts || hasCash) {
@@ -273,6 +284,7 @@ function buildCouponHtml(orderSrc: Order, settings: RestaurantSettings | null, m
     font-weight: 900 !important;
   }
   .big   { font-size: 14px; }
+  .highlight { font-size: 16px; padding: 4px 0; border-top: 2px solid #000; border-bottom: 2px solid #000; margin: 4px 0; }
   .produto-nome {
     font-family: 'Arial Black', sans-serif !important;
     font-weight: 900 !important;
@@ -523,6 +535,19 @@ function buildReceiptBuffer(orderSrc: Order, settings: RestaurantSettings | null
     parts.push(FONT_SMALL, `${dotLine('DESC. FIDELIDADE', `-${fmt(order.loyalty_discount)}`)}\n`, FONT_NORMAL);
   }
   parts.push(BOLD_ON, `${dotLine('TOTAL', fmt(order.total))}\n`, BOLD_OFF);
+
+  // Online payment details
+  const isOnlinePaid = order.payment_status === 'paid' && order.mp_payment_method;
+  if (isOnlinePaid) {
+    const payLabel = order.mp_payment_method === 'pix' ? 'PIX' : 'CARTAO DE CREDITO';
+    parts.push(FONT_SMALL, `${DIVD}\n`, FONT_NORMAL);
+    parts.push(BOLD_ON, `${dotLine(`PAGO ONLINE (${payLabel})`, fmt(order.total))}\n`, BOLD_OFF);
+    parts.push(BOLD_ON, `${DIV}\n`, BOLD_OFF);
+    parts.push(BOLD_ON, `${center('TOTAL A COBRAR NO DESTINO: R$ 0,00')}\n`, BOLD_OFF);
+    parts.push(BOLD_ON, `${DIV}\n`, BOLD_OFF);
+    if (order.mp_payment_id) parts.push(FONT_SMALL, `${center(`TRANSACAO: #${order.mp_payment_id}`)}\n`, FONT_NORMAL);
+    parts.push(FONT_SMALL, `${center(`FORMA DE PAGAMENTO: ONLINE ${payLabel}`)}\n`, FONT_NORMAL);
+  }
   if (order.loyalty_points_earned > 0 || Number(order.loyalty_cashback_earned) > 0) {
     parts.push(FONT_SMALL, `${DIVD}\n`, FONT_NORMAL);
     if (order.loyalty_points_earned > 0) parts.push(FONT_SMALL, `${center(`Neste pedido: +${order.loyalty_points_earned} pts`)}\n`, FONT_NORMAL);

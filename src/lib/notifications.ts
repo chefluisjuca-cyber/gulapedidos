@@ -6,6 +6,7 @@ const LAST_ALERT_KEY = 'gula-validade-last-alert';
 export interface ValidadeAlertConfig {
   responsavelNome: string;
   responsavelTelefone: string;
+  responsavelWhatsapp: string;
   horarioNotificacao: string;
   notificacoesAtivas: boolean;
 }
@@ -13,6 +14,7 @@ export interface ValidadeAlertConfig {
 export const DEFAULT_ALERT_CONFIG: ValidadeAlertConfig = {
   responsavelNome: '',
   responsavelTelefone: '',
+  responsavelWhatsapp: '',
   horarioNotificacao: '08:00',
   notificacoesAtivas: false,
 };
@@ -22,18 +24,20 @@ export async function loadAlertConfig(restaurantId: string | null): Promise<Vali
   try {
     const { data } = await supabase
       .from('restaurant_settings')
-      .select('validade_responsavel_nome, validade_responsavel_telefone, validade_horario_notificacao, validade_notificacoes_ativas')
+      .select('validade_responsavel_nome, validade_responsavel_telefone, validade_responsavel_whatsapp, validade_horario_notificacao, validade_notificacoes_ativas')
       .eq('restaurant_id', restaurantId)
       .maybeSingle();
     const s = data as {
       validade_responsavel_nome?: string | null;
       validade_responsavel_telefone?: string | null;
+      validade_responsavel_whatsapp?: string | null;
       validade_horario_notificacao?: string | null;
       validade_notificacoes_ativas?: boolean | null;
     } | null;
     return {
       responsavelNome: s?.validade_responsavel_nome ?? '',
       responsavelTelefone: s?.validade_responsavel_telefone ?? '',
+      responsavelWhatsapp: s?.validade_responsavel_whatsapp ?? '',
       horarioNotificacao: s?.validade_horario_notificacao ?? '08:00',
       notificacoesAtivas: s?.validade_notificacoes_ativas ?? false,
     };
@@ -49,6 +53,7 @@ export async function saveAlertConfig(restaurantId: string | null, cfg: Validade
     .update({
       validade_responsavel_nome: cfg.responsavelNome || null,
       validade_responsavel_telefone: cfg.responsavelTelefone || null,
+      validade_responsavel_whatsapp: cfg.responsavelWhatsapp || null,
       validade_horario_notificacao: cfg.horarioNotificacao || '08:00',
       validade_notificacoes_ativas: cfg.notificacoesAtivas,
       updated_at: new Date().toISOString(),
@@ -118,6 +123,36 @@ async function countVenceHoje(restaurantId: string): Promise<number> {
   return count ?? 0;
 }
 
+async function fetchVenceHoje(restaurantId: string): Promise<{ produto: string; data_validade: string }[]> {
+  const today = todayStr();
+  const { data } = await supabase
+    .from('etiqueta_registros')
+    .select('produto, data_validade')
+    .eq('restaurant_id', restaurantId)
+    .eq('status', 'ativo')
+    .eq('data_validade', today);
+  return (data as { produto: string; data_validade: string }[] | null) ?? [];
+}
+
+function normalizeWhatsappPhone(raw: string): string {
+  const digits = raw.replace(/\D/g, '');
+  if (!digits) return '';
+  return digits.length <= 11 ? `55${digits}` : digits;
+}
+
+async function sendWhatsappAlert(restaurantId: string, phone: string, nome: string, produtos: { produto: string; data_validade: string }[]): Promise<void> {
+  const normalizedPhone = normalizeWhatsappPhone(phone);
+  if (!normalizedPhone) return;
+  const primeiroNome = nome.trim().split(/\s+/)[0] || 'Responsável';
+  const lista = produtos.map(p => `• ${p.produto}`).join('\n');
+  const message = `*Gula Etiquetas - Alerta de Validade*\n\nOlá ${primeiroNome}!\n\nOs seguintes produtos vencem HOJE e precisam de atenção:\n\n${lista}\n\nAcesse o Controle de Validade para dar saída.`;
+  try {
+    await supabase.functions.invoke('whatsapp-send', {
+      body: { phone: normalizedPhone, message },
+    });
+  } catch { /* ignore */ }
+}
+
 function sendPersonalizedNotification(nome: string, count: number): void {
   if (!isNotificationSupported() || Notification.permission !== 'granted') return;
   try {
@@ -144,9 +179,12 @@ export async function checkValidadeAlerts(restaurantId: string | null): Promise<
   try {
     const cfg = await loadAlertConfig(restaurantId);
     if (!cfg.notificacoesAtivas) return;
-    const count = await countVenceHoje(restaurantId);
-    if (count > 0) {
-      sendPersonalizedNotification(cfg.responsavelNome || 'Responsável', count);
+    const produtos = await fetchVenceHoje(restaurantId);
+    if (produtos.length > 0) {
+      sendPersonalizedNotification(cfg.responsavelNome || 'Responsável', produtos.length);
+      if (cfg.responsavelWhatsapp) {
+        await sendWhatsappAlert(restaurantId, cfg.responsavelWhatsapp, cfg.responsavelNome, produtos);
+      }
       markAlertedToday();
     }
   } catch { /* ignore */ }
@@ -170,9 +208,12 @@ export function startValidadeScheduler(
     if (currentTime !== cfg.horarioNotificacao) return;
 
     try {
-      const count = await countVenceHoje(restaurantId);
-      if (count > 0) {
-        sendPersonalizedNotification(cfg.responsavelNome || 'Responsável', count);
+      const produtos = await fetchVenceHoje(restaurantId);
+      if (produtos.length > 0) {
+        sendPersonalizedNotification(cfg.responsavelNome || 'Responsável', produtos.length);
+        if (cfg.responsavelWhatsapp) {
+          await sendWhatsappAlert(restaurantId, cfg.responsavelWhatsapp, cfg.responsavelNome, produtos);
+        }
         markAlertedToday();
       }
     } catch { /* ignore */ }

@@ -347,12 +347,38 @@ export default function MenuTab() {
     fetchAll();
   }
 
+  async function moveProduct(prodId: string, dir: -1 | 1) {
+    const idx = filteredProducts.findIndex(p => p.id === prodId);
+    const ni = idx + dir;
+    if (ni < 0 || ni >= filteredProducts.length) return;
+    const a = filteredProducts[idx];
+    const b = filteredProducts[ni];
+    await Promise.all([
+      supabase.from('products').update({ sort_order: b.sort_order }).eq('id', a.id),
+      supabase.from('products').update({ sort_order: a.sort_order }).eq('id', b.id),
+    ]);
+    fetchAll();
+  }
+
   function toggleExtras(prodId: string) {
     setExpandedExtras(prev => {
       const next = new Set(prev);
       if (next.has(prodId)) { next.delete(prodId); } else { next.add(prodId); }
       return next;
     });
+  }
+
+  async function moveCategory(catId: string, dir: -1 | 1) {
+    const idx = categories.findIndex(c => c.id === catId);
+    const ni = idx + dir;
+    if (ni < 0 || ni >= categories.length) return;
+    const a = categories[idx];
+    const b = categories[ni];
+    await Promise.all([
+      supabase.from('categories').update({ sort_order: b.sort_order }).eq('id', a.id),
+      supabase.from('categories').update({ sort_order: a.sort_order }).eq('id', b.id),
+    ]);
+    fetchAll();
   }
 
   const activeCategories = categories.filter(c => c.active);
@@ -386,10 +412,16 @@ export default function MenuTab() {
           </button>
         </div>
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-          {categories.map(cat => (
+          {categories.map((cat, ci) => (
             <div key={cat.id} className="bg-[#0f2040] border border-[#1e3868] rounded-xl p-3 flex items-center justify-between group">
-              <span className="text-white text-sm font-medium">{cat.icon && <span className="mr-1">{cat.icon}</span>}{cat.name}</span>
-              <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+              <div className="flex items-center gap-1.5 min-w-0">
+                <div className="flex flex-col gap-0.5 shrink-0">
+                  <button onClick={() => moveCategory(cat.id, -1)} disabled={ci === 0} className="p-0.5 text-slate-400 hover:text-white disabled:opacity-30 transition-opacity" title="Subir"><ArrowUp className="w-3 h-3" /></button>
+                  <button onClick={() => moveCategory(cat.id, 1)} disabled={ci === categories.length - 1} className="p-0.5 text-slate-400 hover:text-white disabled:opacity-30 transition-opacity" title="Descer"><ArrowDown className="w-3 h-3" /></button>
+                </div>
+                <span className="text-white text-sm font-medium truncate">{cat.icon && <span className="mr-1">{cat.icon}</span>}{cat.name}</span>
+              </div>
+              <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
                 <button onClick={() => openCategoryModal(cat)} className="p-1 text-slate-400 hover:text-white"><Pencil className="w-3.5 h-3.5" /></button>
                 <button onClick={() => deleteCategory(cat.id)} className="p-1 text-slate-400 hover:text-red-400"><Trash2 className="w-3.5 h-3.5" /></button>
               </div>
@@ -462,6 +494,10 @@ export default function MenuTab() {
                   <p className="text-amber-400 text-sm font-bold mt-1">R$ {prod.price.toFixed(2).replace('.', ',')}</p>
                 </div>
                 <div className="flex items-center gap-1 shrink-0">
+                  <div className="flex flex-col gap-0.5 mr-1">
+                    <button onClick={() => moveProduct(prod.id, -1)} disabled={filteredProducts.findIndex(p => p.id === prod.id) === 0} className="p-0.5 text-slate-400 hover:text-white disabled:opacity-30 transition-opacity" title="Subir"><ArrowUp className="w-3.5 h-3.5" /></button>
+                    <button onClick={() => moveProduct(prod.id, 1)} disabled={filteredProducts.findIndex(p => p.id === prod.id) === filteredProducts.length - 1} className="p-0.5 text-slate-400 hover:text-white disabled:opacity-30 transition-opacity" title="Descer"><ArrowDown className="w-3.5 h-3.5" /></button>
+                  </div>
                   <button onClick={() => toggleProductActive(prod)} title={prod.active ? 'Ocultar' : 'Exibir'} className={`p-1.5 rounded-lg text-xs transition-colors ${prod.active ? 'bg-green-500/20 text-green-400 hover:bg-red-500/20 hover:text-red-400' : 'bg-[#1a3260] text-slate-500 hover:bg-green-500/20 hover:text-green-400'}`}>
                     {prod.active ? <Check className="w-3.5 h-3.5" /> : <X className="w-3.5 h-3.5" />}
                   </button>

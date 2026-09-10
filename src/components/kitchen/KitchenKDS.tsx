@@ -148,6 +148,18 @@ function OrderCard({ order, shortcutIndex, onAdvance, actionRef }: OrderCardProp
             <div className={`w-2 h-2 rounded-full ${statusInfo.dot} ${isPending ? 'animate-pulse' : ''}`} />
             <span className="text-xs text-slate-400 font-medium">{statusInfo.label}</span>
           </div>
+          {/* Online payment badge — prominent */}
+          {order.payment_status === 'paid' && order.mp_payment_method && (
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-green-500/15 border-2 border-green-500/40 shadow-lg shadow-green-500/10">
+              <CheckCircle className="w-4 h-4 text-green-400 shrink-0" />
+              <div className="flex flex-col leading-tight">
+                <span className="text-[11px] font-black text-green-400 uppercase tracking-wide">
+                  Forma de Pagamento: {order.mp_payment_method === 'pix' ? 'PIX' : 'CARTAO DE CREDITO'}
+                </span>
+                {order.mp_payment_id && <span className="text-[9px] text-green-500 font-mono">Transacao: #{order.mp_payment_id}</span>}
+              </div>
+            </div>
+          )}
         </div>
         <ElapsedTimer createdAt={order.created_at} />
       </div>
@@ -188,6 +200,14 @@ function OrderCard({ order, shortcutIndex, onAdvance, actionRef }: OrderCardProp
           <div className="mt-2 flex items-start gap-1.5 bg-red-500/10 border border-red-500/30 rounded-lg px-2.5 py-2">
             <span className="text-red-400 text-xs font-bold shrink-0 mt-0.5">OBS:</span>
             <p className="text-red-300 text-xs font-medium leading-snug">{order.notes}</p>
+          </div>
+        )}
+
+        {/* Payment status summary */}
+        {order.payment_status === 'paid' && order.mp_payment_method && (
+          <div className="mt-2 flex items-center justify-between gap-2 px-3 py-2 rounded-lg bg-green-500/10 border border-green-500/30">
+            <span className="text-[11px] font-bold text-green-400 uppercase tracking-wide">(PAGO ONLINE)</span>
+            <span className="text-sm font-black text-green-400">R$ {order.total.toFixed(2).replace('.', ',')}</span>
           </div>
         )}
       </div>
@@ -294,14 +314,25 @@ export default function KitchenKDS() {
       .from('orders')
       .select('*, order_items(*)')
       .in('status', ['pending', 'preparing', 'ready'])
+      .or('payment_status.eq.paid,payment_status.is.null,payment_method.not.like.online_%')
       .order('created_at', { ascending: true });
 
     if (!data) return;
-    const incoming = data as Order[];
+    let incoming = data as Order[];
+
+    // SECURITY: Defense-in-depth — hide orders with online payment that is NOT paid
+    incoming = incoming.filter(o => {
+      if (!o.payment_method || !o.payment_method.startsWith('online_')) return true;
+      return o.payment_status === 'paid';
+    });
 
     // Detect new INSERTs: IDs that weren't in the previous snapshot
+    // SECURITY: Only trigger alert for orders that are actually confirmed (paid or non-online)
     const incomingIds = new Set(incoming.map(o => o.id));
-    const hasNewOrder = incoming.some(o => o.status === 'pending' && !prevOrderIds.current.has(o.id));
+    const hasNewOrder = incoming.some(o =>
+      o.status === 'pending' && !prevOrderIds.current.has(o.id) &&
+      (o.payment_status === 'paid' || !o.payment_method || !o.payment_method.startsWith('online_'))
+    );
     if (hasNewOrder) triggerAlert();
     prevOrderIds.current = incomingIds;
 

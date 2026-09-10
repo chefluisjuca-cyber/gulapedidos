@@ -102,7 +102,7 @@ export default function FloatingOrderMonitor() {
 
   // ── Data ───────────────────────────────────────────────────────────
   const fetchData = useCallback(async () => {
-    const ordersQuery = supabase.from('orders').select('id, status').order('created_at', { ascending: false }).limit(50);
+    const ordersQuery = supabase.from('orders').select('id, status, payment_status, payment_method').order('created_at', { ascending: false }).limit(50);
     const callsQuery = supabase.from('waiter_calls').select('id, status').eq('status', 'pending');
 
     const [ordersRes, callsRes] = await Promise.all([
@@ -111,15 +111,18 @@ export default function FloatingOrderMonitor() {
     ]);
 
     if (ordersRes.data) {
-      const newPending = (ordersRes.data as Pick<Order, 'id' | 'status'>[]).filter(o => o.status === 'pending').length;
-      setPendingCount(newPending);
-      if (newPending > prevPendingRef.current) {
+      const newActive = (ordersRes.data as Pick<Order, 'id' | 'status' | 'payment_status' | 'payment_method'>[]).filter(
+        o => o.status === 'pending' &&
+        (o.payment_status === 'paid' || !o.payment_method || !o.payment_method.startsWith('online_'))
+      ).length;
+      setPendingCount(newActive);
+      if (newActive > prevPendingRef.current) {
         startAlertLoop();
         startFlash();
         if ('Notification' in window && Notification.permission === 'granted') {
           try {
             const n = new Notification('🍽️ Novo Pedido!', {
-              body: `${newPending} pedido(s) pendente(s).`,
+              body: `${newActive} pedido(s) pendente(s).`,
               icon: '/gula-pedidos-digial.png',
               tag: 'gula-new-order',
               requireInteraction: true,
@@ -129,8 +132,8 @@ export default function FloatingOrderMonitor() {
           } catch {}
         }
       }
-      if (newPending === 0) { stopAlertLoop(); stopFlash(); }
-      prevPendingRef.current = newPending;
+      if (newActive === 0) { stopAlertLoop(); stopFlash(); }
+      prevPendingRef.current = newActive;
     }
 
     if (callsRes.data) {

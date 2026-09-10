@@ -9,7 +9,6 @@ function GulaCta() {
   return (
     <div className="mt-10">
       <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-orange-600 to-orange-700 px-6 py-10 sm:px-12 sm:py-14 text-center shadow-xl shadow-orange-600/20">
-        {/* Decorative background dots */}
         <div className="absolute inset-0 opacity-10" style={{ backgroundImage: 'radial-gradient(circle, white 1px, transparent 1px)', backgroundSize: '24px 24px' }} />
         <div className="relative">
           <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white/15 text-white text-sm font-medium mb-5">
@@ -35,13 +34,17 @@ function GulaCta() {
   );
 }
 
-export default function SoroBlogEmbed() {
+interface Props {
+  /** When set, hides posts beyond this count and shows a "ver todos" link */
+  maxPosts?: number;
+}
+
+export default function SoroBlogEmbed({ maxPosts }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const location = useLocation();
   const isArticlePage = /^\/blog\/[^/]+/.test(location.pathname);
 
   useEffect(() => {
-    // Avoid duplicate script injection in dev / re-renders
     if (document.getElementById('soro-embed-script')) return;
 
     const script = document.createElement('script');
@@ -51,13 +54,64 @@ export default function SoroBlogEmbed() {
     document.body.appendChild(script);
 
     return () => {
-      // Clean up the injected script and rendered content on unmount
       const existing = document.getElementById('soro-embed-script');
       if (existing) existing.remove();
       const embed = document.getElementById(SORO_EMBED_ID);
       if (embed) embed.innerHTML = '';
     };
   }, []);
+
+  // When maxPosts is set, observe the embed container and hide excess posts
+  useEffect(() => {
+    if (!maxPosts) return;
+    const container = containerRef.current;
+    if (!container) return;
+
+    let linkAdded = false;
+
+    function applyLimit() {
+      const embed = document.getElementById(SORO_EMBED_ID);
+      if (!embed) return;
+
+      // Soro renders post cards as <article> or <a> elements inside the embed
+      const posts = embed.querySelectorAll('article, [data-soro-post], .soro-post, a[href*="/blog/"]');
+      if (posts.length === 0) return;
+
+      posts.forEach((post, idx) => {
+        const el = post as HTMLElement;
+        if (idx >= maxPosts!) {
+          el.style.display = 'none';
+        } else {
+          el.style.display = '';
+        }
+      });
+
+      if (!linkAdded) {
+        linkAdded = true;
+        const wrapper = document.createElement('div');
+        wrapper.style.textAlign = 'center';
+        wrapper.style.marginTop = '2.5rem';
+        wrapper.innerHTML = `<a href="/blog" style="display:inline-flex;align-items:center;gap:0.5rem;padding:0.875rem 2rem;border-radius:9999px;background:#ea580c;color:white;font-weight:700;font-size:0.95rem;text-decoration:none;transition:background 0.2s;">Ver todos os artigos →</a>`;
+        embed.appendChild(wrapper);
+      }
+    }
+
+    // Run immediately in case content is already there
+    applyLimit();
+
+    const observer = new MutationObserver(() => applyLimit());
+    observer.observe(container, { childList: true, subtree: true });
+
+    // Also re-check after a delay (script loads async)
+    const timeout = setTimeout(applyLimit, 2000);
+    const timeout2 = setTimeout(applyLimit, 4000);
+
+    return () => {
+      observer.disconnect();
+      clearTimeout(timeout);
+      clearTimeout(timeout2);
+    };
+  }, [maxPosts]);
 
   return (
     <div>

@@ -1,11 +1,11 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Truck, Save, Check, Printer, X, FileText, AlertCircle, QrCode, Copy, Hash, ChefHat, ExternalLink, Bell, BellOff, Volume2, Music, ImageDown, Plus, Trash2, MapPin, Navigation, Download, Monitor } from 'lucide-react';
+import { Truck, Save, Check, Printer, X, FileText, AlertCircle, QrCode, Copy, Hash, ChefHat, ExternalLink, Bell, BellOff, Volume2, Music, ImageDown, Plus, Trash2, MapPin, Navigation, Download, Monitor, CreditCard, Lock } from 'lucide-react';
 import TutorialHelpButton from './TutorialHelpButton';
 import BusinessHoursSection from './BusinessHoursSection';
 import QRCode from 'qrcode';
 import { supabase } from '../../lib/supabase';
 import { useTenant } from '../../lib/tenant-context';
-import { RestaurantSettings, DeliveryKmZone, BusinessHoursMap } from '../../types';
+import { RestaurantSettings, DeliveryKmZone, BusinessHoursMap, RestaurantPayments } from '../../types';
 import { getDefaultBusinessHours } from '../../lib/business-hours';
 import ImageUpload from './ImageUpload';
 
@@ -66,6 +66,16 @@ export default function SettingsTab() {
   const [qrModal, setQrModal] = useState<{ tableNum: number | null; url: string; dataUrl: string; title: string } | null>(null);
   const [copiedTable, setCopiedTable] = useState<number | null>(null);
 
+  // Online payment state
+  const [payConfig, setPayConfig] = useState<{ id: string } | null>(null);
+  const [payActive, setPayActive] = useState(false);
+  const [mpToken, setMpToken] = useState('');
+  const [mpPublicKey, setMpPublicKey] = useState('');
+  const [allowPix, setAllowPix] = useState(true);
+  const [allowCard, setAllowCard] = useState(true);
+  const [savingPay, setSavingPay] = useState(false);
+  const [savedPay, setSavedPay] = useState(false);
+
   useEffect(() => { fetchSettings(); }, [restaurantId]);
 
   useEffect(() => {
@@ -97,6 +107,7 @@ export default function SettingsTab() {
       setAddress(data.address ?? '');
       setReceiptFooter(data.receipt_footer ?? '');
     }
+    fetchPayments();
   }
 
   async function save() {
@@ -130,6 +141,46 @@ export default function SettingsTab() {
     setSaved(true);
     setTimeout(() => setSaved(false), 2500);
     await fetchSettings();
+  }
+
+  async function fetchPayments() {
+    if (!restaurantId) return;
+    const { data } = await supabase
+      .from('restaurant_payments')
+      .select('id, online_payment_active, mp_access_token, mp_public_key, allow_pix, allow_credit_card')
+      .eq('restaurant_id', restaurantId)
+      .maybeSingle();
+    if (data) {
+      const p = data as RestaurantPayments;
+      setPayConfig({ id: p.id });
+      setPayActive(p.online_payment_active);
+      setMpToken(p.mp_access_token ?? '');
+      setMpPublicKey(p.mp_public_key ?? '');
+      setAllowPix(p.allow_pix);
+      setAllowCard(p.allow_credit_card);
+    }
+  }
+
+  async function savePayments() {
+    if (!restaurantId) return;
+    setSavingPay(true);
+    const payload = {
+      restaurant_id: restaurantId,
+      online_payment_active: payActive,
+      mp_access_token: mpToken || null,
+      mp_public_key: mpPublicKey || null,
+      allow_pix: allowPix,
+      allow_credit_card: allowCard,
+      updated_at: new Date().toISOString(),
+    };
+    const { error } = payConfig?.id
+      ? await supabase.from('restaurant_payments').update(payload).eq('id', payConfig.id)
+      : await supabase.from('restaurant_payments').insert(payload).select().maybeSingle();
+    setSavingPay(false);
+    if (error) { setSaveError('Erro ao salvar configurações de pagamento.'); return; }
+    setSavedPay(true);
+    setTimeout(() => setSavedPay(false), 2500);
+    fetchPayments();
   }
 
   async function saveCupom() {
@@ -700,6 +751,140 @@ export default function SettingsTab() {
                 <p className="text-xs text-slate-500">Ex: 0–3 km → R$ 6,00 · 30 min &nbsp;|&nbsp; 3.1–6 km → R$ 10,00 · 45 min</p>
               )}
             </div>
+          </div>
+        )}
+      </section>
+
+      {/* Pagamento Online (Mercado Pago) */}
+      <section className="bg-[#0f2040] rounded-2xl p-6 border border-[#1e3868] space-y-5">
+        <div>
+          <h3 className="font-semibold text-white text-sm uppercase tracking-wider flex items-center gap-2">
+            <CreditCard className="w-4 h-4 text-cyan-400" /> Pagamento Online (Pix / Cartão) — Add-on
+          </h3>
+          <p className="text-xs text-slate-500 mt-1">Permite que clientes paguem antecipadamente via Pix ou Cartão no checkout do cardápio digital.</p>
+        </div>
+
+        {/* Master toggle */}
+        <button
+          onClick={() => setPayActive(v => !v)}
+          className={`w-full flex items-center justify-between p-4 rounded-xl border-2 transition-all text-left ${
+            payActive ? 'border-cyan-500 bg-cyan-500/10' : 'border-[#1e3868] bg-[#1a3260] hover:border-[#2a4d9a]'
+          }`}
+        >
+          <div className="flex items-center gap-3">
+            <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 transition-colors ${payActive ? 'bg-cyan-500' : 'bg-[#1e3868]'}`}>
+              <CreditCard className="w-5 h-5 text-white" />
+            </div>
+            <div>
+              <p className="font-semibold text-white text-sm">Ativar Pagamento Antecipado no Cardápio</p>
+              <p className="text-xs text-slate-400 mt-0.5">{payActive ? 'Habilitado — clientes podem pagar online.' : 'Desabilitado — pagamento apenas na entrega/balcão.'}</p>
+            </div>
+          </div>
+          <div className={`w-11 h-6 rounded-full transition-colors relative shrink-0 ${payActive ? 'bg-cyan-500' : 'bg-[#1e3868]'}`}>
+            <div className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${payActive ? 'translate-x-[22px]' : 'translate-x-0.5'}`} />
+          </div>
+        </button>
+
+        {payActive && (
+          <div className="space-y-5">
+            {/* Access Token */}
+            <div className="space-y-1.5">
+              <label className="text-xs text-slate-400 font-medium flex items-center gap-1.5">
+                <Lock className="w-3.5 h-3.5 text-cyan-400" />
+                Access Token de Produção do Mercado Pago
+              </label>
+              <input
+                type="password"
+                value={mpToken}
+                onChange={e => setMpToken(e.target.value)}
+                className={inputCls}
+                placeholder="APP_USR-xxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+              />
+              <p className="text-[11px] text-slate-500">Seu token fica armazenado com segurança e é usado apenas no servidor para processar pagamentos.</p>
+            </div>
+
+            {/* Public Key */}
+            <div className="space-y-1.5">
+              <label className="text-xs text-slate-400 font-medium flex items-center gap-1.5">
+                <Lock className="w-3.5 h-3.5 text-cyan-400" />
+                Public Key de Produção do Mercado Pago
+              </label>
+              <input
+                type="text"
+                value={mpPublicKey}
+                onChange={e => setMpPublicKey(e.target.value)}
+                className={inputCls}
+                placeholder="APP_USR-xxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+              />
+              <p className="text-[11px] text-slate-500">Chave pública usada para criptografar os dados do cartão no navegador do cliente.</p>
+            </div>
+
+            {/* Payment methods */}
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                onClick={() => setAllowPix(v => !v)}
+                className={`flex items-center gap-3 p-3 rounded-xl border-2 transition-all text-left ${allowPix ? 'border-cyan-500 bg-cyan-500/10' : 'border-[#1e3868] bg-[#1a3260]'}`}
+              >
+                <div className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 ${allowPix ? 'bg-cyan-500' : 'bg-[#1e3868]'}`}>
+                  <QrCode className="w-4 h-4 text-white" />
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-white">Pix</p>
+                  <p className="text-[11px] text-slate-400">{allowPix ? 'Ativado' : 'Desativado'}</p>
+                </div>
+              </button>
+              <button
+                onClick={() => setAllowCard(v => !v)}
+                className={`flex items-center gap-3 p-3 rounded-xl border-2 transition-all text-left ${allowCard ? 'border-cyan-500 bg-cyan-500/10' : 'border-[#1e3868] bg-[#1a3260]'}`}
+              >
+                <div className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 ${allowCard ? 'bg-cyan-500' : 'bg-[#1e3868]'}`}>
+                  <CreditCard className="w-4 h-4 text-white" />
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-white">Cartão de Crédito</p>
+                  <p className="text-[11px] text-slate-400">{allowCard ? 'Ativado' : 'Desativado'}</p>
+                </div>
+              </button>
+            </div>
+
+            {/* Step-by-step guide */}
+            <div className="bg-[#1a3260]/60 border border-[#1e3868] rounded-xl p-4 space-y-3">
+              <p className="text-xs font-semibold text-cyan-400 uppercase tracking-wider flex items-center gap-1.5">
+                <ExternalLink className="w-3.5 h-3.5" /> Como obter o Access Token
+              </p>
+              <ol className="space-y-2 text-xs text-slate-300">
+                <li className="flex gap-2">
+                  <span className="flex-shrink-0 w-5 h-5 rounded-full bg-cyan-500/20 text-cyan-400 flex items-center justify-center text-[10px] font-bold">1</span>
+                  <span>Acesse o <a href="https://www.mercadopago.com.br/developers/panel" target="_blank" rel="noopener noreferrer" className="text-cyan-400 underline hover:text-cyan-300">Painel de Desenvolvedores do Mercado Pago</a> e faça login com sua conta.</span>
+                </li>
+                <li className="flex gap-2">
+                  <span className="flex-shrink-0 w-5 h-5 rounded-full bg-cyan-500/20 text-cyan-400 flex items-center justify-center text-[10px] font-bold">2</span>
+                  <span>No menu lateral, clique em <strong className="text-white">"Credenciais"</strong>.</span>
+                </li>
+                <li className="flex gap-2">
+                  <span className="flex-shrink-0 w-5 h-5 rounded-full bg-cyan-500/20 text-cyan-400 flex items-center justify-center text-[10px] font-bold">3</span>
+                  <span>Na aba <strong className="text-white">"Produção"</strong>, copie o <strong className="text-white">"Access Token"</strong> e a <strong className="text-white">"Public Key"</strong> exibidos.</span>
+                </li>
+                <li className="flex gap-2">
+                  <span className="flex-shrink-0 w-5 h-5 rounded-full bg-cyan-500/20 text-cyan-400 flex items-center justify-center text-[10px] font-bold">4</span>
+                  <span>Cole ambos nos campos acima e salve as configurações.</span>
+                </li>
+                <li className="flex gap-2">
+                  <span className="flex-shrink-0 w-5 h-5 rounded-full bg-cyan-500/20 text-cyan-400 flex items-center justify-center text-[10px] font-bold">5</span>
+                  <span>Pronto! Seus clientes já podem pagar via Pix ou Cartão no cardápio digital.</span>
+                </li>
+              </ol>
+            </div>
+
+            {/* Save payment button */}
+            <button
+              onClick={savePayments}
+              disabled={savingPay}
+              className="flex items-center gap-2 bg-cyan-500 hover:bg-cyan-400 disabled:opacity-60 text-black font-semibold px-4 py-2.5 rounded-xl text-sm transition-colors"
+            >
+              {savedPay ? <Check className="w-4 h-4" /> : <Save className="w-4 h-4" />}
+              {savedPay ? 'Salvo!' : savingPay ? 'Salvando...' : 'Salvar Pagamento'}
+            </button>
           </div>
         )}
       </section>
