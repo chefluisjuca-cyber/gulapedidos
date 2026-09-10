@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { Clock, ChefHat, CheckCircle, Bell, MapPin, Receipt, MessageSquare, Volume2, VolumeX, Printer, UtensilsCrossed, PlusCircle, BellOff, Trophy, Coins, Percent, Gift, Check, X, Truck, Navigation, Phone, Timer, User, Store, Bike, ClipboardList, ArrowRight, MessageCircle, Send, Hash } from 'lucide-react';
+import { Clock, ChefHat, CheckCircle, Bell, MapPin, Receipt, MessageSquare, Volume2, VolumeX, Printer, UtensilsCrossed, PlusCircle, BellOff, Trophy, Coins, Percent, Gift, Check, X, Truck, Navigation, Phone, Timer, User, Store, Bike, ClipboardList, ArrowRight, MessageCircle, Send, Hash, Trash2, Pencil, Minus } from 'lucide-react';
 import TutorialHelpButton from './TutorialHelpButton';
 import { supabase, normalizeOrderItems } from '../../lib/supabase';
 import { Order, WaiterCall, OrderStatus, RestaurantSettings, OrderMessage } from '../../types';
@@ -96,6 +96,9 @@ export default function OrdersKDS() {
   const [showAddItemsForOrder, setShowAddItemsForOrder] = useState<Order | null>(null);
   const [showTableAssignForOrder, setShowTableAssignForOrder] = useState<Order | null>(null);
   const [tableAssignLoading, setTableAssignLoading] = useState(false);
+  const [editingItemId, setEditingItemId] = useState<string | null>(null);
+  const [editQty, setEditQty] = useState(1);
+  const [deletingItemId, setDeletingItemId] = useState<string | null>(null);
   const [motoboys, setMotoboys] = useState<Motoboy[]>([]);
   const [acceptModal, setAcceptModal] = useState<AcceptModal | null>(null);
 
@@ -461,6 +464,25 @@ export default function OrdersKDS() {
     fetchData();
   }
 
+  async function updateItemQuantity(item: OrderItem, order: Order) {
+    await supabase.from('order_items').update({ quantity: editQty }).eq('id', item.id);
+    const newTotal = (order.order_items ?? []).reduce((s, i) =>
+      i.id === item.id ? s + i.unit_price * editQty : s + i.unit_price * i.quantity, 0
+    ) + (order.delivery_mode === 'delivery' ? order.delivery_fee : 0);
+    await supabase.from('orders').update({ total: newTotal, updated_at: new Date().toISOString() }).eq('id', order.id);
+    setEditingItemId(null);
+    fetchData();
+  }
+
+  async function deleteItem(item: OrderItem, order: Order) {
+    await supabase.from('order_items').delete().eq('id', item.id);
+    const newTotal = (order.order_items ?? []).filter(i => i.id !== item.id).reduce((s, i) => s + i.unit_price * i.quantity, 0)
+      + (order.delivery_mode === 'delivery' ? order.delivery_fee : 0);
+    await supabase.from('orders').update({ total: newTotal, updated_at: new Date().toISOString() }).eq('id', order.id);
+    setDeletingItemId(null);
+    fetchData();
+  }
+
   async function resolveCall(id: string) {
     await supabase.from('waiter_calls').update({ status: 'resolved' }).eq('id', id);
     fetchData();
@@ -821,34 +843,79 @@ export default function OrdersKDS() {
                 )}
               </div>
             </div>
-            {(order.order_items ?? []).map(item => (
+            {(order.order_items ?? []).map(item => {
+              const isEditing = editingItemId === item.id;
+              const isDeleting = deletingItemId === item.id;
+              const canEdit = order.status === 'preparing' || order.status === 'ready';
+              return (
               <div key={item.id} className="flex items-start justify-between">
                 <div className="flex-1 min-w-0">
-                  <p className="text-white text-sm">
-                    <span className="font-medium text-amber-400">{item.quantity}×</span> {item.product_name}
-                  </p>
-                  {item.customizations?.combos?.map((c, i) => {
-                    const chosen = c.items.filter(x => x.qty > 0);
-                    if (!chosen.length) return null;
-                    const gn = (c.groupName ?? '').trim();
-                    return (
-                      <div key={i} className="ml-4">
-                        {gn && <p className="text-slate-500 text-xs">↳ {gn}</p>}
-                        {chosen.map((x, xi) => (
-                          <div key={xi}>
-                            <p className="text-slate-300 text-xs font-medium ml-2">{x.qty > 1 ? `${x.qty}x ` : ''}{x.name}</p>
-                            {(x.extras ?? []).filter(e => e.qty > 0).map((e, ei) => (
-                              <p key={ei} className="text-slate-500 text-xs ml-4">+{e.qty}× {e.name}</p>
+                  {isEditing ? (
+                    <div className="flex items-center gap-2">
+                      <button onClick={() => setEditQty(q => Math.max(1, q - 1))} className="w-6 h-6 rounded-full border border-slate-600 flex items-center justify-center text-slate-400 hover:border-amber-500 hover:text-amber-400 transition-colors">
+                        <Minus className="w-3 h-3" />
+                      </button>
+                      <span className="text-white text-sm font-bold w-6 text-center">{editQty}</span>
+                      <button onClick={() => setEditQty(q => q + 1)} className="w-6 h-6 rounded-full border border-slate-600 flex items-center justify-center text-slate-400 hover:border-amber-500 hover:text-amber-400 transition-colors">
+                        <PlusCircle className="w-3 h-3" />
+                      </button>
+                      <button onClick={() => updateItemQuantity(item, order)} className="text-[11px] font-semibold px-2 py-1 rounded-lg bg-green-500/15 text-green-300 border border-green-500/25 hover:bg-green-500/25 transition-colors">
+                        <Check className="w-3 h-3 inline" /> Salvar
+                      </button>
+                      <button onClick={() => setEditingItemId(null)} className="text-[11px] font-semibold px-2 py-1 rounded-lg bg-slate-700/60 text-slate-300 border border-slate-600 hover:bg-slate-700 transition-colors">
+                        Cancelar
+                      </button>
+                    </div>
+                  ) : isDeleting ? (
+                    <div className="flex items-center gap-2">
+                      <span className="text-red-300 text-xs font-medium">Excluir este item?</span>
+                      <button onClick={() => deleteItem(item, order)} className="text-[11px] font-semibold px-2 py-1 rounded-lg bg-red-500/20 text-red-300 border border-red-500/30 hover:bg-red-500/30 transition-colors">
+                        Sim, excluir
+                      </button>
+                      <button onClick={() => setDeletingItemId(null)} className="text-[11px] font-semibold px-2 py-1 rounded-lg bg-slate-700/60 text-slate-300 border border-slate-600 hover:bg-slate-700 transition-colors">
+                        Cancelar
+                      </button>
+                    </div>
+                  ) : (
+                    <>
+                      <p className="text-white text-sm">
+                        <span className="font-medium text-amber-400">{item.quantity}×</span> {item.product_name}
+                        {canEdit && (
+                          <>
+                            <button onClick={() => { setEditingItemId(item.id); setEditQty(item.quantity); }} className="ml-2 text-slate-500 hover:text-amber-400 transition-colors" title="Editar quantidade">
+                              <Pencil className="w-3 h-3 inline" />
+                            </button>
+                            <button onClick={() => setDeletingItemId(item.id)} className="ml-1 text-slate-500 hover:text-red-400 transition-colors" title="Excluir item">
+                              <Trash2 className="w-3 h-3 inline" />
+                            </button>
+                          </>
+                        )}
+                      </p>
+                      {item.customizations?.combos?.map((c, i) => {
+                        const chosen = c.items.filter(x => x.qty > 0);
+                        if (!chosen.length) return null;
+                        const gn = (c.groupName ?? '').trim();
+                        return (
+                          <div key={i} className="ml-4">
+                            {gn && <p className="text-slate-500 text-xs">↳ {gn}</p>}
+                            {chosen.map((x, xi) => (
+                              <div key={xi}>
+                                <p className="text-slate-300 text-xs font-medium ml-2">{x.qty > 1 ? `${x.qty}x ` : ''}{x.name}</p>
+                                {(x.extras ?? []).filter(e => e.qty > 0).map((e, ei) => (
+                                  <p key={ei} className="text-slate-500 text-xs ml-4">+{e.qty}× {e.name}</p>
+                                ))}
+                              </div>
                             ))}
                           </div>
-                        ))}
-                      </div>
-                    );
-                  })}
+                        );
+                      })}
+                    </>
+                  )}
                 </div>
-                <span className="text-slate-400 text-xs ml-2 shrink-0">R${(item.unit_price * item.quantity).toFixed(2)}</span>
+                {!isEditing && !isDeleting && <span className="text-slate-400 text-xs ml-2 shrink-0">R${(item.unit_price * item.quantity).toFixed(2)}</span>}
               </div>
-            ))}
+              );
+            })}
           </div>
 
           {/* Loyalty info */}
