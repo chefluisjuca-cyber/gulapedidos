@@ -373,6 +373,82 @@ export default function LandingPage() {
         </div>
       </section>
 
+      {/* Módulos do Sistema */}
+      <section id="modulos" className="max-w-6xl mx-auto px-4 sm:px-6 py-16 sm:py-24 bg-slate-950 scroll-mt-20">
+        <div className="text-center mb-12">
+          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-400 text-xs font-semibold mb-4">
+            <Sparkles className="w-3.5 h-3.5" /> Módulos do Sistema
+          </div>
+          <h2 className="text-3xl sm:text-4xl font-bold tracking-tight text-white">Tudo que sua operação precisa, integrado</h2>
+          <p className="mt-3 text-slate-400 max-w-2xl mx-auto">
+            Cada módulo foi pensado para resolver um ponto real do dia a dia do seu restaurante — do pedido à entrega à fidelização.
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+          {[
+            {
+              img: 'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?auto=format&fit=crop&w=800&q=80',
+              badge: 'Pedidos',
+              title: 'Cardápio Digital & Autoatendimento',
+              desc: 'Interface fluida para o cliente pedir em segundos via Web ou QR Code, com seleção de adicionais e cálculo automático de taxa por CEP.',
+            },
+            {
+              img: 'https://images.unsplash.com/photo-1556742049-0a670fc800d1?auto=format&fit=crop&w=800&q=80',
+              badge: 'Pagamentos',
+              title: 'Checkout Pix & Cartão Integrado',
+              desc: 'Pagamento online seguro com confirmação instantânea. O pedido entra na cozinha assim que o pagamento é aprovado.',
+            },
+            {
+              img: 'https://images.unsplash.com/photo-1556910103-1c02745aae4d?auto=format&fit=crop&w=800&q=80',
+              badge: 'Cozinha',
+              title: 'KDS — Monitor de Cozinha',
+              desc: 'Organização visual em tempo real por etapas (Em Preparo, Despachar), com alertas sonoros e impressão de comanda.',
+            },
+            {
+              img: 'https://images.unsplash.com/photo-1617347454431-f49d7ff5c3b1?auto=format&fit=crop&w=800&q=80',
+              badge: 'Delivery',
+              title: 'Rastreio & Gestão de Entregas',
+              desc: 'Acompanhamento ao vivo do status para o cliente final e integração facilitada para a rota dos motoboys.',
+            },
+            {
+              img: 'https://images.unsplash.com/photo-1607082348824-0a96f2a4b9da?auto=format&fit=crop&w=800&q=80',
+              badge: 'Fidelização',
+              title: 'Cashback & Fidelização',
+              desc: 'Sistema automático de créditos e cashback acumulativo para incentivar a recompra no seu próprio canal.',
+            },
+            {
+              img: 'https://images.unsplash.com/photo-1526367790999-0150786686a2?auto=format&fit=crop&w=800&q=80',
+              badge: 'CRM',
+              title: 'Recompra em 1-Clique & CRM',
+              desc: 'Cadastro automatizado do cliente e botão "Refazer Pedido" para o cliente repetir seus itens favoritos instantaneamente.',
+            },
+          ].map((m) => (
+            <div
+              key={m.title}
+              className="group relative flex flex-col rounded-2xl overflow-hidden bg-slate-900 border border-slate-800 hover:border-amber-500/50 transition-all duration-300 hover:shadow-2xl hover:shadow-amber-500/10 hover:-translate-y-1"
+            >
+              <div className="relative h-48 overflow-hidden">
+                <img
+                  src={m.img}
+                  alt={m.title}
+                  loading="lazy"
+                  className="w-full h-48 object-cover transition-transform duration-500 group-hover:scale-105"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-slate-900 via-slate-900/40 to-transparent" />
+                <span className="absolute top-3 left-3 inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/90 text-black text-[11px] font-bold uppercase tracking-wide shadow-lg">
+                  {m.badge}
+                </span>
+              </div>
+              <div className="flex flex-col flex-1 p-5">
+                <h3 className="text-lg font-bold text-white mb-2 group-hover:text-amber-400 transition-colors">{m.title}</h3>
+                <p className="text-sm text-slate-400 leading-relaxed">{m.desc}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
+
       {/* Pricing */}
       <section id="planos" className="max-w-6xl mx-auto px-4 sm:px-6 py-16 sm:py-24 bg-white scroll-mt-20">
         <div className="text-center mb-12">
