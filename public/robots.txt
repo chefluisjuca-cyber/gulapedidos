@@ -1,0 +1,10 @@
+User-agent: *
+Allow: /
+Disallow: /admin
+Disallow: /super-adm
+Disallow: /*/admin
+Disallow: /*/cozinha
+Disallow: /*/entregas
+Disallow: /*/motoboy/
+
+Sitemap: https://gulapedidos.com.br/sitemap.xml

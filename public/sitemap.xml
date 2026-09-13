@@ -1,0 +1,114 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+
+  <!-- Páginas principais -->
+  <url>
+    <loc>https://gulapedidos.com.br/</loc>
+    <changefreq>weekly</changefreq>
+    <priority>1.0</priority>
+  </url>
+  <url>
+    <loc>https://gulapedidos.com.br/cadastrar</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.9</priority>
+  </url>
+  <url>
+    <loc>https://gulapedidos.com.br/entrar</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://gulapedidos.com.br/etiquetas</loc>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://gulapedidos.com.br/tutoriais</loc>
+    <changefreq>weekly</changefreq>
+    <priority>0.7</priority>
+  </url>
+
+  <!-- Blog — página principal -->
+  <url>
+    <loc>https://gulapedidos.com.br/blog</loc>
+    <changefreq>weekly</changefreq>
+    <priority>0.9</priority>
+  </url>
+
+  <!-- Blog — artigos publicados -->
+  <url>
+    <loc>https://gulapedidos.com.br/blog/impressora-comanda-80mm-vs-impressora-etiqueta</loc>
+    <lastmod>2026-08-25T17:34:29+00:00</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>https://gulapedidos.com.br/blog/como-evitar-multas-anvisa-manipulacao-alimentos</loc>
+    <lastmod>2026-08-25T17:34:29+00:00</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>https://gulapedidos.com.br/blog/regras-etiquetagem-produtos-abertos-manipulados-cozinha</loc>
+    <lastmod>2026-08-25T17:34:29+00:00</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>https://gulapedidos.com.br/blog/como-organizar-a-fila-de-espera-do-restaurante</loc>
+    <lastmod>2026-08-23T21:14:12+00:00</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>https://gulapedidos.com.br/blog/como-montar-um-cardapio-lucrativo-para-delivery</loc>
+    <lastmod>2026-08-23T21:15:15+00:00</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>https://gulapedidos.com.br/blog/como-reduzir-taxas-marketplaces-delivery</loc>
+    <lastmod>2026-08-23T19:34:22+00:00</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>https://gulapedidos.com.br/blog/impressora-comanda-etiqueta-delivery</loc>
+    <lastmod>2026-08-23T19:32:52+00:00</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>https://gulapedidos.com.br/blog/cardapio-digital-qr-code-reducao-custos</loc>
+    <lastmod>2026-08-23T21:00:09+00:00</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+  </url>
+
+  <!-- Restaurantes ativos — rotas públicas por slug -->
+  <!-- burguer-garni -->
+  <url>
+    <loc>https://gulapedidos.com.br/burguer-garni/mesa/01</loc>
+    <changefreq>daily</changefreq>
+    <priority>0.6</priority>
+  </url>
+  <url>
+    <loc>https://gulapedidos.com.br/burguer-garni/delivery</loc>
+    <changefreq>daily</changefreq>
+    <priority>0.6</priority>
+  </url>
+  <url>
+    <loc>https://gulapedidos.com.br/burguer-garni/feedback</loc>
+    <changefreq>weekly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://gulapedidos.com.br/burguer-garni/etiquetas</loc>
+    <changefreq>weekly</changefreq>
+    <priority>0.5</priority>
+  </url>
+
+  <!-- Rotas privadas (não indexadas): /admin, /cozinha, /super-adm, /entregas, /motoboy -->
+  <!-- Rotas de autenticação (não indexadas): /admin/login, /admin/dashboard, /admin/posts/* -->
+
+</urlset>
