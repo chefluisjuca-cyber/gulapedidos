@@ -29,8 +29,6 @@ async function sendWhatsApp(phone: string, message: string): Promise<boolean> {
   const normalizedPhone = digitsOnly.length <= 11 ? `55${digitsOnly}` : digitsOnly;
   const endpoint = `https://api.w-api.app/v1/message/send-text?instanceId=${instanceId}`;
 
-  console.log("trial-onboarding: Chave utilizada final:", apiKey.slice(-4));
-
   console.log(`trial-onboarding: sending WhatsApp to ${normalizedPhone} via ${endpoint}`);
   const response = await fetch(endpoint, {
     method: "POST",
@@ -66,7 +64,6 @@ Deno.serve(async (req: Request) => {
 
     const now = new Date();
 
-    // Fetch all active-trial restaurants with a phone number
     const { data: restaurants, error } = await supabase
       .from("restaurants")
       .select("id, name, phone, slug, created_at, trial_ends_at, whatsapp_step")
@@ -85,57 +82,73 @@ Deno.serve(async (req: Request) => {
       const createdAt = new Date(restaurant.created_at);
       const daysSinceCreated = Math.floor((now.getTime() - createdAt.getTime()) / (1000 * 60 * 60 * 24));
 
-      let stepToSend = 0;
-      let message = "";
+      const steps: { step: number; message: string }[] = [];
 
-      // Determine which reminder to send based on days since creation and current step.
-      // Step 1 (welcome) is sent immediately at signup, so we only handle steps 2 and 3 here.
-      if (daysSinceCreated >= 3 && daysSinceCreated < 6 && restaurant.whatsapp_step < 2) {
-        stepToSend = 2;
-        message = `Oi, ${restaurant.name}! Passando pra lembrar que seu teste grátis do Gula está valendo. ⏳
+      if (daysSinceCreated >= 3 && restaurant.whatsapp_step < 2) {
+        steps.push({
+          step: 2,
+          message: `Oi, ${restaurant.name}! Passando pra lembrar que seu teste grátis do Gula está valendo. ⏳
 
 Preparamos vídeos diretos ao ponto para te ajudar a configurar tudo sem complicação.
 🎥 Acesse nossa central de tutoriais: https://gulapedidos.com.br/tutoriais
 
-Aproveite para deixar seu sistema rodando!`;
-      } else if (daysSinceCreated >= 6 && restaurant.whatsapp_step < 3) {
-        stepToSend = 3;
-        message = `Fala, ${restaurant.name}! Amanhã é o último dia do seu teste grátis no Gula. ⚠️
+Aproveite para deixar seu sistema rodando!`,
+        });
+      }
+
+      if (daysSinceCreated >= 6 && restaurant.whatsapp_step < 3) {
+        steps.push({
+          step: 3,
+          message: `Fala, ${restaurant.name}! Amanhã é o último dia do seu teste grátis no Gula. ⚠️
 
 Para continuar usando o sistema sem interrupções, escolha o seu plano direto no link abaixo:
 👉 Garantir assinatura: ${linkCheckout}
 
-(Dica: No plano anual você garante o maior desconto mensal).`;
+(Dica: No plano anual você garante o maior desconto mensal).`,
+        });
       }
 
-      if (stepToSend === 0) {
+      if (steps.length === 0) {
         continue;
       }
 
       const phone = restaurant.phone!;
-      const sent = await sendWhatsApp(phone, message);
+      let allSent = true;
+      let lastStepSent = restaurant.whatsapp_step;
 
-      if (sent) {
-        // Update whatsapp_step
-        const { error: updateError } = await supabase
-          .from("restaurants")
-          .update({ whatsapp_step: stepToSend })
-          .eq("id", restaurant.id);
+      for (const s of steps) {
+        const sent = await sendWhatsApp(phone, s.message);
+        if (sent) {
+          lastStepSent = s.step;
+          const { error: updateError } = await supabase
+            .from("restaurants")
+            .update({ whatsapp_step: s.step })
+            .eq("id", restaurant.id);
 
-        if (updateError) {
-          console.error(`trial-onboarding: failed to update whatsapp_step for ${restaurant.id}`, updateError.message);
+          if (updateError) {
+            console.error(`trial-onboarding: failed to update whatsapp_step for ${restaurant.id}`, updateError.message);
+          }
+        } else {
+          allSent = false;
+          break;
         }
+        results.push({
+          restaurant_id: restaurant.id,
+          step: s.step,
+          sent,
+          reason: sent ? undefined : "WhatsApp API error",
+        });
       }
 
-      results.push({
-        restaurant_id: restaurant.id,
-        step: stepToSend,
-        sent,
-        reason: sent ? undefined : "WhatsApp API error",
-      });
+      if (!allSent && lastStepSent > restaurant.whatsapp_step) {
+        results.push({
+          restaurant_id: restaurant.id,
+          step: lastStepSent,
+          sent: true,
+        });
+      }
     }
 
-    // Check for expired trials (trial_ends_at < now and still active)
     const { error: expireError } = await supabase
       .from("restaurants")
       .update({ trial_status: "expired" })
