@@ -418,10 +418,10 @@ export default function LandingPage() {
               desc: 'Sistema automático de créditos e cashback acumulativo para incentivar a recompra no seu próprio canal.',
             },
             {
-              img: 'https://images.unsplash.com/photo-1526367790999-0150786686a2?auto=format&fit=crop&w=800&q=80',
-              badge: 'CRM',
-              title: 'Recompra em 1-Clique & CRM',
-              desc: 'Cadastro automatizado do cliente e botão "Refazer Pedido" para o cliente repetir seus itens favoritos instantaneamente.',
+              img: 'https://images.pexels.com/photos/12935090/pexels-photo-12935090.jpeg?auto=compress&cs=tinysrgb&h=650&w=940',
+              badge: 'Etiquetas',
+              title: 'Etiquetas de Validade Térmicas',
+              desc: 'Etiquetas de validade térmicas para segurança alimentar, com cálculo automático de vencimento. Assistente IA para determinar a validade correta.',
             },
           ].map((m) => (
             <div
