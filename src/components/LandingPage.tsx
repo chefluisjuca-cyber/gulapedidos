@@ -980,19 +980,19 @@ export default function LandingPage() {
               background: 'linear-gradient(to bottom, rgba(250,250,250,0) 0%, rgba(250,250,250,0.9) 60%, #FAFAFA 100%)',
             }}
           />
-          <div className="mt-8 text-center relative z-10 flex flex-col sm:flex-row items-center justify-center gap-3">
+          <div className="mt-8 relative z-10 flex items-center justify-between gap-3">
+            <Link
+              to="/"
+              className="inline-flex items-center gap-2 px-6 py-3.5 rounded-full bg-white border border-slate-300 text-slate-700 font-semibold text-base hover:bg-slate-50 transition-colors"
+            >
+              Voltar para o Início
+            </Link>
             <Link
               to="/blog"
               className="inline-flex items-center gap-2 px-7 py-3.5 rounded-full bg-orange-600 text-white font-semibold text-base hover:bg-orange-700 transition-colors shadow-lg"
             >
               Ver Todos os Artigos
               <ArrowRight className="w-5 h-5" />
-            </Link>
-            <Link
-              to="/"
-              className="inline-flex items-center gap-2 px-6 py-3.5 rounded-full bg-white border border-slate-300 text-slate-700 font-semibold text-base hover:bg-slate-50 transition-colors"
-            >
-              Voltar para o Início
             </Link>
           </div>
         </div>
