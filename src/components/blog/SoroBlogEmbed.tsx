@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { ArrowRight, Sparkles, Home } from 'lucide-react';
+import { ArrowRight, Sparkles, Home, ArrowLeft } from 'lucide-react';
 
 const SORO_EMBED_ID = 'soro-blog';
 const SORO_SCRIPT_SRC = 'https://app.trysoro.com/api/embed/e633213f-35fd-4a83-b615-3184e9f084d1';
@@ -59,12 +59,19 @@ export default function SoroBlogEmbed() {
   return (
     <div>
       {isArticlePage && (
-        <div className="mb-6">
+        <div className="mb-6 flex items-center justify-between gap-3">
+          <Link
+            to="/"
+            className="inline-flex items-center gap-1.5 text-sm font-semibold text-slate-600 hover:text-slate-900 transition-colors"
+          >
+            <Home className="w-4 h-4" />
+            Voltar para o Início
+          </Link>
           <Link
             to="/blog"
             className="inline-flex items-center gap-1.5 text-sm font-semibold text-slate-600 hover:text-slate-900 transition-colors"
           >
-            <Home className="w-4 h-4" />
+            <ArrowLeft className="w-4 h-4" />
             Voltar para o Blog
           </Link>
         </div>

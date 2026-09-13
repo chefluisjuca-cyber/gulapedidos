@@ -124,6 +124,23 @@ export default function BlogListPage() {
       {/* Blog embed + no-results message */}
       <section className="py-8 sm:py-12 min-h-[400px]">
         <div className="max-w-6xl mx-auto px-4 sm:px-6">
+          {/* Navigation buttons: left = home, right = trial */}
+          <div className="flex items-center justify-between gap-3 mb-8">
+            <Link
+              to="/"
+              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-white border border-slate-300 text-slate-700 font-semibold text-sm hover:bg-slate-50 transition-colors"
+            >
+              <Home className="w-4 h-4" />
+              Voltar para o Início
+            </Link>
+            <Link
+              to="/cadastrar"
+              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-orange-600 text-white font-semibold text-sm hover:bg-orange-700 transition-colors"
+            >
+              Testar 7 Dias Grátis
+            </Link>
+          </div>
+
           {noResults && (
             <div className="flex flex-col items-center justify-center py-20 text-center">
               <div className="w-16 h-16 rounded-2xl bg-slate-100 flex items-center justify-center mb-5">
