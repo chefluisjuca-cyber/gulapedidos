@@ -374,13 +374,13 @@ export default function LandingPage() {
       </section>
 
       {/* Módulos do Sistema */}
-      <section id="modulos" className="max-w-6xl mx-auto px-4 sm:px-6 py-16 sm:py-24 bg-slate-950 scroll-mt-20">
+      <section id="modulos" className="max-w-6xl mx-auto px-4 sm:px-6 py-16 sm:py-24 bg-white scroll-mt-20">
         <div className="text-center mb-12">
           <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-400 text-xs font-semibold mb-4">
             <Sparkles className="w-3.5 h-3.5" /> Módulos do Sistema
           </div>
-          <h2 className="text-3xl sm:text-4xl font-bold tracking-tight text-white">Tudo que sua operação precisa, integrado</h2>
-          <p className="mt-3 text-slate-400 max-w-2xl mx-auto">
+          <h2 className="text-3xl sm:text-4xl font-bold tracking-tight text-slate-900">Tudo que sua operação precisa, integrado</h2>
+          <p className="mt-3 text-slate-600 max-w-2xl mx-auto">
             Cada módulo foi pensado para resolver um ponto real do dia a dia do seu restaurante — do pedido à entrega à fidelização.
           </p>
         </div>
@@ -426,7 +426,7 @@ export default function LandingPage() {
           ].map((m) => (
             <div
               key={m.title}
-              className="group relative flex flex-col rounded-2xl overflow-hidden bg-slate-900 border border-slate-800 hover:border-amber-500/50 transition-all duration-300 hover:shadow-2xl hover:shadow-amber-500/10 hover:-translate-y-1"
+              className="group relative flex flex-col rounded-2xl overflow-hidden bg-white border border-slate-200 hover:border-amber-400 transition-all duration-300 hover:shadow-xl hover:shadow-amber-500/10 hover:-translate-y-1"
             >
               <div className="relative h-48 overflow-hidden">
                 <img
@@ -435,14 +435,14 @@ export default function LandingPage() {
                   loading="lazy"
                   className="w-full h-48 object-cover transition-transform duration-500 group-hover:scale-105"
                 />
-                <div className="absolute inset-0 bg-gradient-to-t from-slate-900 via-slate-900/40 to-transparent" />
+                <div className="absolute inset-0 bg-gradient-to-t from-white via-white/30 to-transparent" />
                 <span className="absolute top-3 left-3 inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/90 text-black text-[11px] font-bold uppercase tracking-wide shadow-lg">
                   {m.badge}
                 </span>
               </div>
               <div className="flex flex-col flex-1 p-5">
-                <h3 className="text-lg font-bold text-white mb-2 group-hover:text-amber-400 transition-colors">{m.title}</h3>
-                <p className="text-sm text-slate-400 leading-relaxed">{m.desc}</p>
+                <h3 className="text-lg font-bold text-slate-900 mb-2 group-hover:text-amber-600 transition-colors">{m.title}</h3>
+                <p className="text-sm text-slate-600 leading-relaxed">{m.desc}</p>
               </div>
             </div>
           ))}
