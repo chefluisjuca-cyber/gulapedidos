@@ -394,7 +394,7 @@ export default function LandingPage() {
               desc: 'Interface fluida para o cliente pedir em segundos via Web ou QR Code, com seleção de adicionais e cálculo automático de taxa por CEP.',
             },
             {
-              img: 'https://images.unsplash.com/photo-1556742049-0a670fc800d1?auto=format&fit=crop&w=800&q=80',
+              img: 'https://images.pexels.com/photos/11316617/pexels-photo-11316617.jpeg?auto=compress&cs=tinysrgb&h=650&w=940',
               badge: 'Pagamentos',
               title: 'Checkout Pix & Cartão Integrado',
               desc: 'Pagamento online seguro com confirmação instantânea. O pedido entra na cozinha assim que o pagamento é aprovado.',
