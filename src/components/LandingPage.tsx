@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import {
   Zap, QrCode, UtensilsCrossed, ChefHat, Ticket, Tag, ArrowRight,
   Store, ClipboardList, Rocket, CheckCircle2, ShieldCheck, Smartphone,
@@ -960,7 +960,35 @@ export default function LandingPage() {
               Conteúdos práticos escritos por quem entende a rotina real de um restaurante.
             </p>
           </div>
-          <SoroBlogEmbed maxPosts={3} />
+          <div
+            style={{
+              maxHeight: '620px',
+              overflow: 'hidden',
+              position: 'relative',
+            }}
+          >
+            <SoroBlogEmbed />
+          </div>
+          <div
+            style={{
+              pointerEvents: 'none',
+              position: 'absolute',
+              bottom: '0',
+              left: '0',
+              right: '0',
+              height: '120px',
+              background: 'linear-gradient(to bottom, rgba(250,250,250,0) 0%, rgba(250,250,250,0.9) 60%, #FAFAFA 100%)',
+            }}
+          />
+          <div className="mt-8 text-center relative z-10">
+            <Link
+              to="/blog"
+              className="inline-flex items-center gap-2 px-7 py-3.5 rounded-full bg-orange-600 text-white font-semibold text-base hover:bg-orange-700 transition-colors shadow-lg"
+            >
+              Ver Todos os Artigos
+              <ArrowRight className="w-5 h-5" />
+            </Link>
+          </div>
         </div>
       </section>
 
