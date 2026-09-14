@@ -30,12 +30,15 @@ export default function PushOptIn() {
     setErrorMsg('');
 
     const digits = phone.replace(/\D/g, '');
-    // Try to find the lead by phone
+    // The phone is stored formatted like "(11) 96423-3303" but the user may type
+    // it with or without formatting. Search by the last 8 digits to match regardless
+    // of how the phone was stored.
+    const lastDigits = digits.slice(-8);
     const { data: leads } = await supabase
       .from('feedback_leads')
       .select('id, name, push_enabled')
       .eq('restaurant_id', restaurantId)
-      .or(`phone.ilike.%${digits}%`)
+      .ilike('phone', `%${lastDigits}%`)
       .order('created_at', { ascending: false })
       .limit(1)
       .maybeSingle();
