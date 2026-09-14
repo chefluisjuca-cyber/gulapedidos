@@ -108,7 +108,6 @@ const MODULE_DEFS = [
   { id: MODULES.GULA_PEDIDOS,    label: 'Gula Pedidos Digital', color: 'amber',  desc: 'Cardápio digital + KDS + caixa' },
   { id: MODULES.GULA_FIDELIDADE, label: 'Gula Fidelidade',      color: 'teal',   desc: 'Pontos, cashback e recompensas' },
   { id: MODULES.GULA_ETIQUETAS,  label: 'Gula Etiquetas',       color: 'emerald', desc: 'Etiquetas de validade para segurança alimentar' },
-  { id: MODULES.GULA_FILA,       label: 'Gula Fila',            color: 'blue',    desc: 'Gestão de filas de espera e atendimento' },
   { id: MODULES.GULA_FEEDBACK,  label: 'Gula Feedback',        color: 'rose',    desc: 'Pesquisa de satisfação + roleta de prêmios' },
 ] as const;
 

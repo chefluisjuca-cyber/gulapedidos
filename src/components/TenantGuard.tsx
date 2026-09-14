@@ -6,6 +6,7 @@ import { TenantContext } from '../lib/tenant-context';
 import { Restaurant } from '../types';
 
 const STANDALONE_PLANS: string[] = ['gula_etiquetas_standalone', 'gula_fila_standalone', 'gula_feedback_standalone'];
+const MODULES_EXCLUDED_FROM_TRIAL: string[] = ['gula_fila'];
 
 interface Props {
   children: ReactNode;
@@ -146,7 +147,7 @@ export default function TenantGuard({ children, requiredModule, requireOwnership
 
         const isStandalonePlan = r.plan != null && STANDALONE_PLANS.includes(r.plan);
         const trialActiveNow = r.status === 'trial' && (!r.trial_ends_at || new Date() < new Date(r.trial_ends_at));
-        const trialFullUnlock = trialActiveNow && !isStandalonePlan;
+        const trialFullUnlock = trialActiveNow && !isStandalonePlan && !MODULES_EXCLUDED_FROM_TRIAL.includes(requiredModule ?? '');
 
         if (requiredModule && !trialFullUnlock && !r.modules.includes(requiredModule as never)) {
           setError('no_module'); setLoading(false); return;
@@ -200,7 +201,7 @@ export default function TenantGuard({ children, requiredModule, requireOwnership
     restaurant?.status === 'trial' &&
     (!restaurant?.trial_ends_at || new Date() < new Date(restaurant.trial_ends_at));
   const isStandalonePlan = restaurant?.plan != null && STANDALONE_PLANS.includes(restaurant.plan);
-  const trialFullUnlock = trialActive && !isStandalonePlan;
+  const trialFullUnlock = trialActive && !isStandalonePlan && !MODULES_EXCLUDED_FROM_TRIAL.includes(requiredModule ?? '');
   const daysLeft = trialActive && restaurant?.trial_ends_at
     ? Math.max(0, Math.ceil((new Date(restaurant!.trial_ends_at!).getTime() - Date.now()) / (1000 * 60 * 60 * 24)))
     : 0;
@@ -209,7 +210,7 @@ export default function TenantGuard({ children, requiredModule, requireOwnership
     <TenantContext.Provider
       value={{
         restaurant,
-        hasModule: (m) => !restaurant || trialFullUnlock || restaurant.modules.includes(m as never),
+        hasModule: (m) => !restaurant || (trialFullUnlock && !MODULES_EXCLUDED_FROM_TRIAL.includes(m)) || restaurant.modules.includes(m as never),
       }}
     >
       {trialActive && !bypassPaywall && (
