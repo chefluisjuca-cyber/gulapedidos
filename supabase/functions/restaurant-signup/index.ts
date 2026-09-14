@@ -105,6 +105,8 @@ Deno.serve(async (req: Request) => {
       pedidos_fidelidade: ["gula_pedidos", "gula_fidelidade"],
       pedidos_fidelidade_etiquetas: ["gula_pedidos", "gula_fidelidade", "gula_etiquetas"],
       gula_etiquetas_standalone: ["gula_etiquetas"],
+      gula_fila_standalone: ["gula_fila"],
+      gula_feedback_standalone: ["gula_feedback"],
     };
     const modules = PLAN_MODULES[plan] ?? PLAN_MODULES.essencial;
 

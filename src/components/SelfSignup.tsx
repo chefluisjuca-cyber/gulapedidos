@@ -32,7 +32,11 @@ export default function SelfSignup() {
     return <LoginView onBack={() => setMode('form')} onSuccess={() => navigate(0)} />;
   }
   if (mode === 'success' && result) {
-    return <SuccessView slug={result.slug} name={result.name} plan={initialPlan ?? 'essencial'} onGoAdmin={() => navigate(initialPlan === 'gula_etiquetas_standalone' ? `/${result.slug}/etiquetas` : `/${result.slug}/admin`)} />;
+    const standaloneRoute =
+      initialPlan === 'gula_etiquetas_standalone' ? `/${result.slug}/etiquetas` :
+      initialPlan === 'gula_fila_standalone' || initialPlan === 'gula_feedback_standalone' ? `/${result.slug}/admin` :
+      `/${result.slug}/admin`;
+    return <SuccessView slug={result.slug} name={result.name} plan={initialPlan ?? 'essencial'} onGoAdmin={() => navigate(standaloneRoute)} />;
   }
   return <SignupForm initialPlan={initialPlan ?? 'essencial'} onBack={() => navigate('/')} onGoLogin={() => setMode('login')} onDone={(r) => { setResult(r); setMode('success'); }} />;
 }
@@ -242,9 +246,10 @@ function SignupForm({ initialPlan, onBack, onGoLogin, onDone }: {
 
 // ── Success View ─────────────────────────────────────────────────────────────
 function SuccessView({ slug, name, plan, onGoAdmin }: { slug: string; name: string; plan: RestaurantPlan; onGoAdmin: () => void }) {
-  const isAdminEtiquetas = plan === 'gula_etiquetas_standalone';
+  const isStandalone = plan !== 'essencial' && plan !== 'pedidos_fidelidade' && plan !== 'pedidos_fidelidade_etiquetas';
+  const isEtiquetasOnly = plan === 'gula_etiquetas_standalone';
   const PROD_ORIGIN = 'https://gulapedidos.com.br';
-  const adminUrl = `${PROD_ORIGIN}/${slug}/${isAdminEtiquetas ? 'etiquetas' : 'admin'}`;
+  const adminUrl = `${PROD_ORIGIN}/${slug}/${isEtiquetasOnly ? 'etiquetas' : 'admin'}`;
   const menuUrl = `${PROD_ORIGIN}/${slug}`;
 
   return (
@@ -264,14 +269,14 @@ function SuccessView({ slug, name, plan, onGoAdmin }: { slug: string; name: stri
         </div>
 
         <div className="bg-white backdrop-blur-sm border border-slate-200 rounded-2xl shadow-xl p-6 space-y-5">
-          <CopyUrlField label={isAdminEtiquetas ? "URL do Painel de Etiquetas" : "URL do Painel Administrativo"} url={adminUrl} />
-          {!isAdminEtiquetas && <CopyUrlField label="URL do Cardápio Público" url={menuUrl} />}
+          <CopyUrlField label={isEtiquetasOnly ? "URL do Painel de Etiquetas" : "URL do Painel Administrativo"} url={adminUrl} />
+          {!isStandalone && <CopyUrlField label="URL do Cardápio Público" url={menuUrl} />}
 
           <button
             onClick={onGoAdmin}
             className="w-full bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white font-semibold py-3.5 px-4 rounded-xl transition-all duration-200 flex items-center justify-center gap-2 shadow-lg shadow-amber-500/25"
           >
-            Acessar meu painel administrativo <ArrowRight className="w-5 h-5" />
+            Acessar meu painel <ArrowRight className="w-5 h-5" />
           </button>
         </div>
       </div>
@@ -349,8 +354,11 @@ function LoginView({ onBack, onSuccess }: { onBack: () => void; onSuccess: () =>
         .select('modules, plan')
         .eq('slug', restaurant.slug)
         .maybeSingle();
-      const isEtiquetasOnly = rest?.modules?.length === 1 && rest.modules.includes('gula_etiquetas') && !rest.modules.includes('gula_pedidos');
-      navigate(`/${restaurant.slug}/${isEtiquetasOnly ? 'etiquetas' : 'admin'}`);
+      const isStandaloneOnly = rest?.modules && !rest.modules.includes('gula_pedidos');
+      const standaloneRoute =
+        rest?.modules?.includes('gula_etiquetas') ? 'etiquetas' :
+        'admin';
+      navigate(`/${restaurant.slug}/${isStandaloneOnly ? standaloneRoute : 'admin'}`);
       return;
     }
 

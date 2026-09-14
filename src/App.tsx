@@ -195,7 +195,7 @@ export default function App() {
           <Route
             path="/:slug/feedback"
             element={
-              <TenantGuard requiredModule={MODULES.GULA_PEDIDOS}>
+              <TenantGuard requiredModule={MODULES.GULA_FEEDBACK}>
                 <FeedbackSurvey />
               </TenantGuard>
             }

@@ -22,16 +22,20 @@ function AdminContent() {
   const navigate = useNavigate();
   const restaurantId = restaurant?.id ?? null;
 
-  // For an etiquetas-standalone restaurant (only gula_etiquetas), default to etiquetas tab.
-  const isEtiquetasOnly = hasModule(MODULES.GULA_ETIQUETAS) && !hasModule(MODULES.GULA_PEDIDOS);
+  // For standalone restaurants (no gula_pedidos), default to the first available module tab.
+  const isStandaloneOnly = !hasModule(MODULES.GULA_PEDIDOS);
+  const defaultStandaloneTab: Tab =
+    hasModule(MODULES.GULA_ETIQUETAS) ? 'etiquetas' :
+    hasModule(MODULES.GULA_FEEDBACK) ? 'feedback' :
+    'etiquetas';
 
   const [activeTab, setActiveTabRaw] = useState<Tab>(() => {
     const hash = typeof window !== 'undefined' ? window.location.hash.replace('#', '') : '';
     const saved = typeof window !== 'undefined' ? localStorage.getItem('gula-admin-tab') : null;
     const candidate = (hash || saved) as Tab | null;
-    const validTabs: Tab[] = ['orders', 'menu', 'settings', 'loyalty', 'etiquetas', 'gestao'];
+    const validTabs: Tab[] = ['orders', 'menu', 'settings', 'loyalty', 'etiquetas', 'gestao', 'feedback'];
     if (candidate && validTabs.includes(candidate)) return candidate;
-    return isEtiquetasOnly ? 'etiquetas' : 'orders';
+    return isStandaloneOnly ? defaultStandaloneTab : 'orders';
   });
   const [pendingOrders, setPendingOrders] = useState(0);
   const [pendingCalls, setPendingCalls] = useState(0);
@@ -46,7 +50,7 @@ function AdminContent() {
   useEffect(() => {
     const onHash = () => {
       const h = window.location.hash.replace('#', '') as Tab;
-      const validTabs: Tab[] = ['orders', 'menu', 'settings', 'loyalty', 'etiquetas', 'gestao'];
+      const validTabs: Tab[] = ['orders', 'menu', 'settings', 'loyalty', 'etiquetas', 'gestao', 'feedback'];
       if (h && validTabs.includes(h) && h !== activeTab) setActiveTabRaw(h);
     };
     window.addEventListener('hashchange', onHash);
@@ -84,12 +88,12 @@ function AdminContent() {
     { id: 'loyalty' as Tab,    label: 'Fidelidade',  labelShort: 'Fidelid.',  icon: Trophy,          badge: 0,                            module: MODULES.GULA_FIDELIDADE },
     { id: 'etiquetas' as Tab,  label: 'Etiquetas',   labelShort: 'Etiquetas', icon: Tag,             badge: 0,                            module: MODULES.GULA_ETIQUETAS },
     { id: 'gestao' as Tab,    label: 'Gestão',       labelShort: 'Gestão',     icon: BarChart3,       badge: 0,                            module: MODULES.GULA_PEDIDOS },
-    { id: 'feedback' as Tab, label: 'Feedback',     labelShort: 'Feedback',  icon: MessageSquare, badge: 0,                            module: MODULES.GULA_PEDIDOS },
+    { id: 'feedback' as Tab, label: 'Feedback',     labelShort: 'Feedback',  icon: MessageSquare, badge: 0,                            module: MODULES.GULA_FEEDBACK },
   ];
   const tabs = allTabs.filter(t => hasModule(t.module));
 
-  // Tabs the user doesn't have (locked) — shown only for etiquetas-only restaurants as upgrade hints
-  const lockedTabs = isEtiquetasOnly
+  // Tabs the user doesn't have (locked) — shown for standalone-only restaurants as upgrade hints
+  const lockedTabs = isStandaloneOnly
     ? allTabs.filter(t => !hasModule(t.module))
     : [];
 
@@ -191,8 +195,8 @@ function AdminContent() {
           {activeTab === 'etiquetas'  && <EtiquetasTab />}
           {activeTab === 'gestao'     && <GestaoTab />}
           {activeTab === 'feedback'   && <FeedbackTab />}
-        {/* Etiquetas-only upgrade banner */}
-        {isEtiquetasOnly && (
+        {/* Standalone-only upgrade banner */}
+        {isStandaloneOnly && (
           <div className="m-4 p-4 rounded-2xl border border-amber-500/30 bg-amber-500/5 flex items-center justify-between gap-4">
             <div>
               <p className="text-amber-400 font-semibold text-sm">Quer mais recursos?</p>
