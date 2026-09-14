@@ -7,6 +7,7 @@ import SuperAdminPanel from './components/superadmin/SuperAdminPanel';
 import EntregasPanel from './components/entregas/EntregasPanel';
 import MotoboyCelularView from './components/motoboy/MotoboyCelularView';
 import FeedbackSurvey from './components/feedback/FeedbackSurvey';
+import PushOptIn from './components/feedback/PushOptIn';
 import BillingTab from './components/admin/BillingTab';
 import LandingPage from './components/LandingPage';
 import TutorialsPage from './components/TutorialsPage';
@@ -197,6 +198,14 @@ export default function App() {
             element={
               <TenantGuard requiredModule={MODULES.GULA_FEEDBACK}>
                 <FeedbackSurvey />
+              </TenantGuard>
+            }
+          />
+          <Route
+            path="/:slug/notificacoes"
+            element={
+              <TenantGuard requiredModule={MODULES.GULA_FEEDBACK}>
+                <PushOptIn />
               </TenantGuard>
             }
           />

@@ -898,6 +898,7 @@ function PushSender({ restaurantId, restaurantSlug, restaurantName }: {
 }) {
   const [message, setMessage] = useState('');
   const [pushCount, setPushCount] = useState(0);
+  const [totalLeads, setTotalLeads] = useState(0);
   const [sending, setSending] = useState(false);
   const [result, setResult] = useState<{ sent: number; failed: number } | null>(null);
   const [error, setError] = useState('');
@@ -913,6 +914,11 @@ function PushSender({ restaurantId, restaurantSlug, restaurantName }: {
       .eq('push_enabled', true)
       .not('push_subscription', 'is', null);
     setPushCount(count ?? 0);
+    const { count: total } = await supabase
+      .from('feedback_leads')
+      .select('id', { count: 'exact' })
+      .eq('restaurant_id', restaurantId);
+    setTotalLeads(total ?? 0);
   }
 
   async function sendPush() {
@@ -995,11 +1001,54 @@ function PushSender({ restaurantId, restaurantSlug, restaurantName }: {
 
         {pushCount === 0 && (
           <p className="text-xs text-amber-400/70 text-center">
-            Nenhum cliente autorizou notificacoes push ainda. As notificacoes sao oferecidas
-            aos clientes ao final da pesquisa de satisfacao.
+            Nenhum cliente autorizou notificacoes push ainda. Use o convite abaixo para
+            ativar os leads existentes, ou aguarde novos clientes preencherem a pesquisa.
           </p>
         )}
       </div>
+
+      {totalLeads > pushCount && (
+        <div className="bg-[#0f2040] rounded-2xl p-6 border border-[#1e3868] space-y-4">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-blue-500/15 flex items-center justify-center">
+              <MessageSquare className="w-5 h-5 text-blue-400" />
+            </div>
+            <div>
+              <h3 className="text-white font-semibold text-sm">Convidar Leads Existentes</h3>
+              <p className="text-xs text-slate-500 mt-0.5">
+                {totalLeads - pushCount} cliente(s) sem notificacao ativa. Envie o link
+                de opt-in via WhatsApp para ativar push em segundos.
+              </p>
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <button
+              onClick={() => navigator.clipboard.writeText(`${window.location.origin}/${restaurantSlug}/notificacoes`)}
+              className="flex-1 flex items-center justify-center gap-2 bg-[#1e3868] hover:bg-[#2a4d8f] text-white font-medium py-3 rounded-xl transition-colors text-sm"
+            >
+              <QrCode className="w-4 h-4" />
+              Copiar Link
+            </button>
+            <a
+              href={`https://wa.me/?text=${encodeURIComponent(
+                `Ola! O ${restaurantName} tem ofertas exclusivas para voce. Toque aqui para ativar as notificacoes e receber promocoes: ${window.location.origin}/${restaurantSlug}/notificacoes`
+              )}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex-1 flex items-center justify-center gap-2 bg-green-600 hover:bg-green-500 text-white font-medium py-3 rounded-xl transition-colors text-sm"
+            >
+              <Send className="w-4 h-4" />
+              Enviar via WhatsApp
+            </a>
+          </div>
+          <div className="bg-[#1a3260]/40 rounded-xl p-3">
+            <p className="text-[11px] text-slate-500 leading-relaxed text-center">
+              O cliente acessa o link, confirma o telefone usado na pesquisa e autoriza
+              as notificacoes do navegador. Pronto -- ele passa a receber seus disparos push.
+            </p>
+          </div>
+        </div>
+      )}
 
       {error && (
         <div className="text-sm text-red-400 bg-red-500/10 border border-red-500/30 rounded-xl px-4 py-3">
