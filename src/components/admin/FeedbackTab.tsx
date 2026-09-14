@@ -1,11 +1,11 @@
 import { useState, useEffect } from 'react';
-import { MessageSquare, Gift, Ticket, Users, BarChart3, Plus, Trash2, Edit2, Check, X, Search, Award, TrendingUp, Send, QrCode, Download } from 'lucide-react';
+import { MessageSquare, Gift, Ticket, Users, BarChart3, Plus, Trash2, Edit2, Check, X, Search, Award, TrendingUp, Send, QrCode, Download, Bell } from 'lucide-react';
 import QRCode from 'qrcode';
 import { supabase } from '../../lib/supabase';
 import { useTenant } from '../../lib/tenant-context';
 import { FeedbackQuestion, FeedbackPrize, FeedbackVoucher, FeedbackLead, FeedbackQuestionType } from '../../types';
 
-type SubTab = 'questions' | 'prizes' | 'validator' | 'metrics' | 'leads';
+type SubTab = 'questions' | 'prizes' | 'validator' | 'metrics' | 'leads' | 'push';
 
 const inputCls = 'w-full bg-[#1a3260] border border-[#1e3868] rounded-xl px-4 py-2.5 text-white text-sm focus:outline-none focus:border-amber-500 transition-colors';
 
@@ -29,6 +29,7 @@ export default function FeedbackTab() {
           { id: 'validator' as SubTab, label: 'Validar Vouchers', icon: Ticket },
           { id: 'metrics' as SubTab, label: 'Metricas', icon: BarChart3 },
           { id: 'leads' as SubTab, label: 'Leads', icon: Users },
+          { id: 'push' as SubTab, label: 'Disparar Push', icon: Bell },
         ]).map(t => (
           <button
             key={t.id}
@@ -48,6 +49,7 @@ export default function FeedbackTab() {
       {subTab === 'validator' && <VoucherValidator restaurantId={restaurantId} />}
       {subTab === 'metrics' && <MetricsView restaurantId={restaurantId} />}
       {subTab === 'leads' && <LeadsManager restaurantId={restaurantId} />}
+      {subTab === 'push' && <PushSender restaurantId={restaurantId} restaurantSlug={restaurant?.slug ?? ''} restaurantName={restaurant?.name ?? ''} />}
     </div>
   );
 }
@@ -884,6 +886,147 @@ function LeadsManager({ restaurantId }: { restaurantId: string | null }) {
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+// ── Push Sender ─────────────────────────────────────────────────────────
+function PushSender({ restaurantId, restaurantSlug, restaurantName }: {
+  restaurantId: string | null;
+  restaurantSlug: string;
+  restaurantName: string;
+}) {
+  const [message, setMessage] = useState('');
+  const [pushCount, setPushCount] = useState(0);
+  const [sending, setSending] = useState(false);
+  const [result, setResult] = useState<{ sent: number; failed: number } | null>(null);
+  const [error, setError] = useState('');
+
+  useEffect(() => { fetchPushCount(); }, [restaurantId]);
+
+  async function fetchPushCount() {
+    if (!restaurantId) return;
+    const { count } = await supabase
+      .from('feedback_leads')
+      .select('id', { count: 'exact' })
+      .eq('restaurant_id', restaurantId)
+      .eq('push_enabled', true)
+      .not('push_subscription', 'is', null);
+    setPushCount(count ?? 0);
+  }
+
+  async function sendPush() {
+    if (!message.trim() || !restaurantId) return;
+    setSending(true);
+    setError('');
+    setResult(null);
+    try {
+      const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-mass-push`;
+      const response = await fetch(apiUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+        },
+        body: JSON.stringify({
+          restaurant_id: restaurantId,
+          message: message.trim(),
+        }),
+      });
+      if (!response.ok) {
+        const errData = await response.json().catch(() => ({}));
+        throw new Error(errData.error || `Erro ${response.status}`);
+      }
+      const data = await response.json();
+      setResult({ sent: data.sent ?? 0, failed: data.failed ?? 0 });
+      fetchPushCount();
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setSending(false);
+    }
+  }
+
+  return (
+    <div className="space-y-5">
+      <div className="bg-[#0f2040] rounded-2xl p-6 border border-[#1e3868] space-y-4">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-amber-500/15 flex items-center justify-center">
+            <Bell className="w-5 h-5 text-amber-400" />
+          </div>
+          <div>
+            <h3 className="text-white font-semibold text-sm">Disparar Notificacao Push</h3>
+            <p className="text-xs text-slate-500 mt-0.5">
+              Envia uma notificacao para todos os {pushCount} cliente(s) que autorizaram push.
+            </p>
+          </div>
+        </div>
+
+        <div>
+          <label className="block text-xs text-slate-400 mb-1.5">Mensagem da Notificacao</label>
+          <textarea
+            value={message}
+            onChange={e => setMessage(e.target.value)}
+            placeholder="Ex: Ganhe 15% OFF pedindo pelo nosso cardapio hoje!"
+            rows={3}
+            className={inputCls + ' resize-none'}
+            maxLength={200}
+          />
+          <p className="text-[10px] text-slate-600 mt-1 text-right">{message.length}/200</p>
+        </div>
+
+        <button
+          onClick={sendPush}
+          disabled={sending || !message.trim() || pushCount === 0}
+          className="w-full flex items-center justify-center gap-2 bg-amber-500 hover:bg-amber-400 disabled:opacity-50 disabled:cursor-not-allowed text-black font-bold py-3.5 rounded-xl transition-colors text-sm"
+        >
+          {sending ? (
+            <>
+              <div className="w-4 h-4 border-2 border-black/30 border-t-black rounded-full animate-spin" />
+              Enviando...
+            </>
+          ) : (
+            <>
+              <Send className="w-4 h-4" />
+              Enviar Notificacao para {pushCount} {pushCount === 1 ? 'Lead' : 'Leads'}
+            </>
+          )}
+        </button>
+
+        {pushCount === 0 && (
+          <p className="text-xs text-amber-400/70 text-center">
+            Nenhum cliente autorizou notificacoes push ainda. As notificacoes sao oferecidas
+            aos clientes ao final da pesquisa de satisfacao.
+          </p>
+        )}
+      </div>
+
+      {error && (
+        <div className="text-sm text-red-400 bg-red-500/10 border border-red-500/30 rounded-xl px-4 py-3">
+          {error}
+        </div>
+      )}
+
+      {result && (
+        <div className="text-sm text-green-400 bg-green-500/10 border border-green-500/30 rounded-xl px-4 py-3 flex items-center gap-2">
+          <Check className="w-4 h-4 shrink-0" />
+          Notificacao enviada com sucesso para {result.sent} {result.sent === 1 ? 'cliente' : 'clientes'}!
+          {result.failed > 0 && (
+            <span className="text-amber-400 ml-2">
+              ({result.failed} falharam e foram desativados)
+            </span>
+          )}
+        </div>
+      )}
+
+      <div className="bg-[#1a3260]/40 border border-[#1e3868] rounded-xl p-4">
+        <p className="text-xs text-slate-500 leading-relaxed">
+          <strong className="text-slate-400">Como funciona:</strong> O titulo da notificacao
+          (nome do restaurante) e o link de destino (cardapio digital) sao definidos automaticamente.
+          O cliente recebe a notificacao no navegador ou celular, e ao clicar e direcionado ao seu cardapio.
+          Tokens invalidos sao automaticamente desativados para manter a base limpa.
+        </p>
+      </div>
     </div>
   );
 }

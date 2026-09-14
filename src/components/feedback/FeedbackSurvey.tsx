@@ -112,8 +112,48 @@ export default function FeedbackSurvey() {
     setLoading(false);
     if (err || !data) { setError('Erro ao cadastrar. Tente novamente.'); return; }
     setLeadId(data.id);
+    // Attempt to capture push subscription after lead is saved
+    capturePushSubscription(data.id, sessionId);
     await fetchPrizes();
     setPhase('roulette');
+  }
+
+  async function capturePushSubscription(leadId: string, sessionId: string) {
+    try {
+      if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
+      const permission = await Notification.requestPermission();
+      if (permission !== 'granted') return;
+      const reg = await navigator.serviceWorker.ready;
+      const sub = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(import.meta.env.VITE_VAPID_PUBLIC_KEY ?? ''),
+      });
+      const subJson = sub.toJSON();
+      await supabase
+        .from('feedback_leads')
+        .update({
+          push_subscription: {
+            endpoint: subJson.endpoint,
+            keys: {
+              p256dh: subJson.keys?.p256dh ?? '',
+              auth: subJson.keys?.auth ?? '',
+            },
+          },
+          push_enabled: true,
+        })
+        .eq('id', leadId);
+    } catch {
+      // Push subscription is optional — silently ignore failures
+    }
+  }
+
+  function urlBase64ToUint8Array(base64: string): Uint8Array {
+    const padding = '='.repeat((4 - (base64.length % 4)) % 4);
+    const base64Str = (base64 + padding).replace(/-/g, '+').replace(/_/g, '/');
+    const raw = atob(base64Str);
+    const arr = new Uint8Array(raw.length);
+    for (let i = 0; i < raw.length; i++) arr[i] = raw.charCodeAt(i);
+    return arr;
   }
 
   async function fetchPrizes() {

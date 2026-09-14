@@ -783,6 +783,8 @@ export interface FeedbackLead {
   email: string | null;
   birthday: string | null;
   opt_in: boolean;
+  push_subscription: Record<string, unknown> | null;
+  push_enabled: boolean | null;
   created_at: string;
 }
 
