@@ -78,7 +78,7 @@ Deno.serve(async (req: Request) => {
 
     // Filter by birthday month if push_type is "birthday"
     const targetLeads = push_type === "birthday" && birthday_month
-      ? leads.filter((l: { birthday?: string }) => l.birthday && l.birthday.slice(5) === birthday_month)
+      ? leads.filter((l: { birthday?: string }) => l.birthday && l.birthday.slice(5, 7) === birthday_month)
       : leads;
 
     if (!targetLeads || targetLeads.length === 0) {

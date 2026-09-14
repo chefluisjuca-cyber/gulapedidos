@@ -824,7 +824,7 @@ function LeadsManager({ restaurantId }: { restaurantId: string | null }) {
   useEffect(() => { fetchLeads(); }, [filterOptIn]);
 
   const filtered = filterMonth
-    ? leads.filter(l => l.birthday && l.birthday.slice(5) === filterMonth)
+    ? leads.filter(l => l.birthday && l.birthday.slice(5, 7) === filterMonth)
     : leads;
 
   const optInCount = leads.filter(l => l.opt_in).length;
@@ -878,7 +878,7 @@ function LeadsManager({ restaurantId }: { restaurantId: string | null }) {
                 <div className="flex flex-wrap items-center gap-x-4 gap-y-0.5 text-xs text-slate-500">
                   {l.phone && <span>{l.phone}</span>}
                   {l.email && <span className="truncate">{l.email}</span>}
-                  {l.birthday && <span>Aniv: {new Date(l.birthday).toLocaleDateString('pt-BR')}</span>}
+                  {l.birthday && <span>Aniv: {l.birthday.split('-').reverse().join('/')}</span>}
                   <span>{new Date(l.created_at).toLocaleDateString('pt-BR')}</span>
                 </div>
               </div>
@@ -940,7 +940,7 @@ function PushSender({ restaurantId }: {
           .eq('push_enabled', true)
           .not('push_subscription', 'is', null)
           .then(({ data }) => {
-            const filtered = (data ?? []).filter(l => l.birthday && l.birthday.slice(5) === birthdayMonth);
+            const filtered = (data ?? []).filter(l => l.birthday && l.birthday.slice(5, 7) === birthdayMonth);
             setBirthdayCount(filtered.length);
           });
         void c;
