@@ -49,7 +49,7 @@ export default function FeedbackTab() {
       {subTab === 'validator' && <VoucherValidator restaurantId={restaurantId} />}
       {subTab === 'metrics' && <MetricsView restaurantId={restaurantId} />}
       {subTab === 'leads' && <LeadsManager restaurantId={restaurantId} />}
-      {subTab === 'push' && <PushSender restaurantId={restaurantId} restaurantSlug={restaurant?.slug ?? ''} restaurantName={restaurant?.name ?? ''} />}
+      {subTab === 'push' && <PushSender restaurantId={restaurantId} />}
     </div>
   );
 }
@@ -836,10 +836,17 @@ function LeadsManager({ restaurantId }: { restaurantId: string | null }) {
       <div className="flex flex-wrap items-center gap-3">
         <div className="flex items-center gap-2">
           <label className="text-xs text-slate-400">Aniversariantes do mes:</label>
-          <select value={filterMonth} onChange={e => setFilterMonth(e.target.value)} className={`${inputCls} w-40`}>
-            <option value="">Todos</option>
-            {['01','02','03','04','05','06','07','08','09','10','11','12'].map(m => (
-              <option key={m} value={m}>{m}</option>
+          <select value={filterMonth} onChange={e => setFilterMonth(e.target.value)} className={`${inputCls} w-44`}>
+            <option value="">Todos os meses</option>
+            {[
+              { v: '01', l: 'Janeiro' }, { v: '02', l: 'Fevereiro' },
+              { v: '03', l: 'Marco' }, { v: '04', l: 'Abril' },
+              { v: '05', l: 'Maio' }, { v: '06', l: 'Junho' },
+              { v: '07', l: 'Julho' }, { v: '08', l: 'Agosto' },
+              { v: '09', l: 'Setembro' }, { v: '10', l: 'Outubro' },
+              { v: '11', l: 'Novembro' }, { v: '12', l: 'Dezembro' },
+            ].map(m => (
+              <option key={m.v} value={m.v}>{m.l}</option>
             ))}
           </select>
         </div>
@@ -891,14 +898,14 @@ function LeadsManager({ restaurantId }: { restaurantId: string | null }) {
 }
 
 // ── Push Sender ─────────────────────────────────────────────────────────
-function PushSender({ restaurantId, restaurantSlug, restaurantName }: {
+function PushSender({ restaurantId }: {
   restaurantId: string | null;
-  restaurantSlug: string;
-  restaurantName: string;
 }) {
   const [message, setMessage] = useState('');
   const [pushCount, setPushCount] = useState(0);
-  const [totalLeads, setTotalLeads] = useState(0);
+  const [birthdayCount, setBirthdayCount] = useState(0);
+  const [pushType, setPushType] = useState<'all' | 'birthday'>('all');
+  const [birthdayMonth, setBirthdayMonth] = useState('');
   const [sending, setSending] = useState(false);
   const [result, setResult] = useState<{ sent: number; failed: number } | null>(null);
   const [error, setError] = useState('');
@@ -914,12 +921,31 @@ function PushSender({ restaurantId, restaurantSlug, restaurantName }: {
       .eq('push_enabled', true)
       .not('push_subscription', 'is', null);
     setPushCount(count ?? 0);
-    const { count: total } = await supabase
-      .from('feedback_leads')
-      .select('id', { count: 'exact' })
-      .eq('restaurant_id', restaurantId);
-    setTotalLeads(total ?? 0);
   }
+
+  useEffect(() => {
+    if (!restaurantId || pushType !== 'birthday' || !birthdayMonth) { setBirthdayCount(0); return; }
+    supabase
+      .from('feedback_leads')
+      .select('id,birthday', { count: 'exact' })
+      .eq('restaurant_id', restaurantId)
+      .eq('push_enabled', true)
+      .not('push_subscription', 'is', null)
+      .then(({ count: c }) => {
+        // PostgREST can't filter on substring of birthday directly, so we fetch and filter client-side
+        supabase
+          .from('feedback_leads')
+          .select('id,birthday')
+          .eq('restaurant_id', restaurantId)
+          .eq('push_enabled', true)
+          .not('push_subscription', 'is', null)
+          .then(({ data }) => {
+            const filtered = (data ?? []).filter(l => l.birthday && l.birthday.slice(5) === birthdayMonth);
+            setBirthdayCount(filtered.length);
+          });
+        void c;
+      });
+  }, [restaurantId, pushType, birthdayMonth]);
 
   async function sendPush() {
     if (!message.trim() || !restaurantId) return;
@@ -937,6 +963,8 @@ function PushSender({ restaurantId, restaurantSlug, restaurantName }: {
         body: JSON.stringify({
           restaurant_id: restaurantId,
           message: message.trim(),
+          push_type: pushType,
+          birthday_month: pushType === 'birthday' ? birthdayMonth : undefined,
         }),
       });
       if (!response.ok) {
@@ -969,6 +997,43 @@ function PushSender({ restaurantId, restaurantSlug, restaurantName }: {
         </div>
 
         <div>
+          <label className="block text-xs text-slate-400 mb-1.5">Tipo de Envio</label>
+          <div className="flex gap-2">
+            <button onClick={() => setPushType('all')}
+              className={`flex-1 py-2.5 rounded-xl text-xs font-medium border-2 transition-all ${
+                pushType === 'all' ? 'border-amber-500 bg-amber-500/10 text-amber-300' : 'border-[#1e3868] bg-[#1a3260] text-slate-400'
+              }`}>
+              Geral (todos)
+            </button>
+            <button onClick={() => setPushType('birthday')}
+              className={`flex-1 py-2.5 rounded-xl text-xs font-medium border-2 transition-all ${
+                pushType === 'birthday' ? 'border-amber-500 bg-amber-500/10 text-amber-300' : 'border-[#1e3868] bg-[#1a3260] text-slate-400'
+              }`}>
+              Aniversariantes do mes
+            </button>
+          </div>
+        </div>
+
+        {pushType === 'birthday' && (
+          <div>
+            <label className="block text-xs text-slate-400 mb-1.5">Mes de aniversario</label>
+            <select value={birthdayMonth} onChange={e => setBirthdayMonth(e.target.value)} className={inputCls}>
+              <option value="">Selecione o mes</option>
+              {[
+                { v: '01', l: 'Janeiro' }, { v: '02', l: 'Fevereiro' },
+                { v: '03', l: 'Marco' }, { v: '04', l: 'Abril' },
+                { v: '05', l: 'Maio' }, { v: '06', l: 'Junho' },
+                { v: '07', l: 'Julho' }, { v: '08', l: 'Agosto' },
+                { v: '09', l: 'Setembro' }, { v: '10', l: 'Outubro' },
+                { v: '11', l: 'Novembro' }, { v: '12', l: 'Dezembro' },
+              ].map(m => (
+                <option key={m.v} value={m.v}>{m.l}</option>
+              ))}
+            </select>
+          </div>
+        )}
+
+        <div>
           <label className="block text-xs text-slate-400 mb-1.5">Mensagem da Notificacao</label>
           <textarea
             value={message}
@@ -983,7 +1048,7 @@ function PushSender({ restaurantId, restaurantSlug, restaurantName }: {
 
         <button
           onClick={sendPush}
-          disabled={sending || !message.trim() || pushCount === 0}
+          disabled={sending || !message.trim() || (pushType === 'all' ? pushCount === 0 : !birthdayMonth || birthdayCount === 0)}
           className="w-full flex items-center justify-center gap-2 bg-amber-500 hover:bg-amber-400 disabled:opacity-50 disabled:cursor-not-allowed text-black font-bold py-3.5 rounded-xl transition-colors text-sm"
         >
           {sending ? (
@@ -994,61 +1059,23 @@ function PushSender({ restaurantId, restaurantSlug, restaurantName }: {
           ) : (
             <>
               <Send className="w-4 h-4" />
-              Enviar Notificacao para {pushCount} {pushCount === 1 ? 'Lead' : 'Leads'}
+              Enviar para {pushType === 'all' ? pushCount : birthdayCount} {pushType === 'all' ? (pushCount === 1 ? 'Lead' : 'Leads') : (birthdayCount === 1 ? 'Aniversariante' : 'Aniversariantes')}
             </>
           )}
         </button>
 
         {pushCount === 0 && (
           <p className="text-xs text-amber-400/70 text-center">
-            Nenhum cliente autorizou notificacoes push ainda. Use o convite abaixo para
-            ativar os leads existentes, ou aguarde novos clientes preencherem a pesquisa.
+            Nenhum cliente autorizou notificacoes push ainda. As notificacoes sao oferecidas
+            aos clientes ao final da pesquisa de satisfacao.
+          </p>
+        )}
+        {pushType === 'birthday' && birthdayMonth && birthdayCount === 0 && pushCount > 0 && (
+          <p className="text-xs text-amber-400/70 text-center">
+            Nenhum aniversariante deste mes com notificacao ativa.
           </p>
         )}
       </div>
-
-      {totalLeads > pushCount && (
-        <div className="bg-[#0f2040] rounded-2xl p-6 border border-[#1e3868] space-y-4">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-blue-500/15 flex items-center justify-center">
-              <MessageSquare className="w-5 h-5 text-blue-400" />
-            </div>
-            <div>
-              <h3 className="text-white font-semibold text-sm">Convidar Leads Existentes</h3>
-              <p className="text-xs text-slate-500 mt-0.5">
-                {totalLeads - pushCount} cliente(s) sem notificacao ativa. Envie o link
-                de opt-in via WhatsApp para ativar push em segundos.
-              </p>
-            </div>
-          </div>
-          <div className="flex gap-2">
-            <button
-              onClick={() => navigator.clipboard.writeText(`${window.location.origin}/${restaurantSlug}/notificacoes`)}
-              className="flex-1 flex items-center justify-center gap-2 bg-[#1e3868] hover:bg-[#2a4d8f] text-white font-medium py-3 rounded-xl transition-colors text-sm"
-            >
-              <QrCode className="w-4 h-4" />
-              Copiar Link
-            </button>
-            <a
-              href={`https://wa.me/?text=${encodeURIComponent(
-                `Ola! O ${restaurantName} tem ofertas exclusivas para voce. Toque aqui para ativar as notificacoes e receber promocoes: ${window.location.origin}/${restaurantSlug}/notificacoes`
-              )}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex-1 flex items-center justify-center gap-2 bg-green-600 hover:bg-green-500 text-white font-medium py-3 rounded-xl transition-colors text-sm"
-            >
-              <Send className="w-4 h-4" />
-              Enviar via WhatsApp
-            </a>
-          </div>
-          <div className="bg-[#1a3260]/40 rounded-xl p-3">
-            <p className="text-[11px] text-slate-500 leading-relaxed text-center">
-              O cliente acessa o link, confirma o telefone usado na pesquisa e autoriza
-              as notificacoes do navegador. Pronto -- ele passa a receber seus disparos push.
-            </p>
-          </div>
-        </div>
-      )}
 
       {error && (
         <div className="text-sm text-red-400 bg-red-500/10 border border-red-500/30 rounded-xl px-4 py-3">

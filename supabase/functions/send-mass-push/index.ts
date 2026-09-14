@@ -12,11 +12,18 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
-    const { restaurant_id, message } = await req.json();
+    const { restaurant_id, message, push_type, birthday_month } = await req.json();
 
     if (!restaurant_id || !message) {
       return new Response(
         JSON.stringify({ error: "restaurant_id and message are required" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
+    if (push_type === "birthday" && !birthday_month) {
+      return new Response(
+        JSON.stringify({ error: "birthday_month is required for birthday push type" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
@@ -57,7 +64,7 @@ Deno.serve(async (req: Request) => {
     // Fetch all active push subscriptions for this restaurant
     const { data: leads, error: leadsError } = await supabase
       .from("feedback_leads")
-      .select("id, push_subscription, push_enabled")
+      .select("id, push_subscription, push_enabled, birthday")
       .eq("restaurant_id", restaurant_id)
       .eq("push_enabled", true)
       .not("push_subscription", "is", null);
@@ -69,7 +76,12 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    if (!leads || leads.length === 0) {
+    // Filter by birthday month if push_type is "birthday"
+    const targetLeads = push_type === "birthday" && birthday_month
+      ? leads.filter((l: { birthday?: string }) => l.birthday && l.birthday.slice(5) === birthday_month)
+      : leads;
+
+    if (!targetLeads || targetLeads.length === 0) {
       return new Response(
         JSON.stringify({ success: true, sent: 0, failed: 0, message: "No leads with push enabled" }),
         { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
@@ -103,8 +115,8 @@ Deno.serve(async (req: Request) => {
 
     // Send pushes in parallel batches
     const batchSize = 10;
-    for (let i = 0; i < leads.length; i += batchSize) {
-      const batch = leads.slice(i, i + batchSize);
+    for (let i = 0; i < targetLeads.length; i += batchSize) {
+      const batch = targetLeads.slice(i, i + batchSize);
       const results = await Promise.allSettled(
         batch.map(async (lead) => {
           const sub = lead.push_subscription as {

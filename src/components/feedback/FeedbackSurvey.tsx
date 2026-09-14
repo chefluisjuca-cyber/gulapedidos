@@ -96,6 +96,27 @@ export default function FeedbackSurvey() {
     if (!optIn) { setError('E necessario aceitar os termos para participar.'); return; }
     setError('');
     setLoading(true);
+
+    // Check for duplicates by phone or email
+    if (phone.trim() || email.trim()) {
+      const phoneDigits = phone.replace(/\D/g, '');
+      const orFilters: string[] = [];
+      if (phoneDigits) orFilters.push(`phone.ilike.%${phoneDigits}%`);
+      if (email.trim()) orFilters.push(`email.ilike.${email.trim()}`);
+      const { data: existing } = await supabase
+        .from('feedback_leads')
+        .select('id')
+        .eq('restaurant_id', restaurantId)
+        .or(orFilters.join(','))
+        .limit(1)
+        .maybeSingle();
+      if (existing) {
+        setLoading(false);
+        setError('Voce ja participou da nossa pesquisa. Agradecemos seu feedback!');
+        return;
+      }
+    }
+
     const { data, error: err } = await supabase
       .from('feedback_leads')
       .insert({
