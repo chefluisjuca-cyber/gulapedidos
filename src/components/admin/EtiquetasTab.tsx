@@ -3,7 +3,7 @@ import {
   Tag, Printer, Plus, Trash2, Pencil, X, Check, ChefHat,
   PackageOpen, User, Users, Save, Search, FolderOpen, FolderPlus, Minus,
   Zap, AlertCircle, Settings, CalendarClock, AlertTriangle, CheckCircle2, PackageCheck,
-  Sparkles, ChevronRight,
+  Sparkles, ChevronRight, XCircle,
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useTenant } from '../../lib/tenant-context';
@@ -195,8 +195,8 @@ function OperacaoView({ restaurantId, restaurantName }: { restaurantId: string |
         copies: quantidade,
         size: etiquetaSize,
       });
-      const fabDate = dataImpressao.toISOString().slice(0, 10);
-      const valDate = dataVencimento.toISOString().slice(0, 10);
+      const fabDate = `${dataImpressao.getFullYear()}-${String(dataImpressao.getMonth() + 1).padStart(2, '0')}-${String(dataImpressao.getDate()).padStart(2, '0')}`;
+      const valDate = `${dataVencimento.getFullYear()}-${String(dataVencimento.getMonth() + 1).padStart(2, '0')}-${String(dataVencimento.getDate()).padStart(2, '0')}`;
       await supabase.from('etiqueta_registros').insert({
         restaurant_id: restaurantId,
         produto: selectedProdutoObj?.nome ?? '',
@@ -1064,12 +1064,22 @@ function ControleView({ restaurantId }: { restaurantId: string | null }) {
     fetchRegistros();
   }
 
-  const today = new Date().toISOString().slice(0, 10);
-  const tomorrow = new Date(Date.now() + 86400000).toISOString().slice(0, 10);
+  // Use local date to avoid UTC timezone shifting the day
+  const localDateStr = (d: Date) => {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  };
+  const today = localDateStr(new Date());
+  const tomorrowDate = new Date();
+  tomorrowDate.setDate(tomorrowDate.getDate() + 1);
+  const tomorrow = localDateStr(tomorrowDate);
 
+  const vencidos = registros.filter(r => r.status === 'ativo' && r.data_validade < today);
   const venceHoje = registros.filter(r => r.status === 'ativo' && r.data_validade === today);
   const venceAmanha = registros.filter(r => r.status === 'ativo' && r.data_validade === tomorrow);
-  const noPrazo = registros.filter(r => r.status === 'ativo' && r.data_validade !== today && r.data_validade !== tomorrow);
+  const noPrazo = registros.filter(r => r.status === 'ativo' && r.data_validade > tomorrow);
 
   if (loading) return <Spinner />;
 
@@ -1118,6 +1128,9 @@ function ControleView({ restaurantId }: { restaurantId: string | null }) {
         <EmptyState icon={CalendarClock} text="Nenhuma etiqueta registrada ainda. Imprima etiquetas para acompanhar as validades aqui." />
       ) : filter === 'ativo' ? (
         <>
+          {vencidos.length > 0 && (
+            <ValidadeSection title="Vencidos" icon={XCircle} color="red" items={vencidos} fmtDateBR={fmtDateBR} onSaida={darSaida} />
+          )}
           {venceHoje.length > 0 && (
             <ValidadeSection title="Vence Hoje" icon={AlertTriangle} color="red" items={venceHoje} fmtDateBR={fmtDateBR} onSaida={darSaida} />
           )}
@@ -1127,7 +1140,7 @@ function ControleView({ restaurantId }: { restaurantId: string | null }) {
           {noPrazo.length > 0 && (
             <ValidadeSection title="No Prazo" icon={CheckCircle2} color="emerald" items={noPrazo} fmtDateBR={fmtDateBR} onSaida={darSaida} />
           )}
-          {venceHoje.length === 0 && venceAmanha.length === 0 && noPrazo.length === 0 && (
+          {vencidos.length === 0 && venceHoje.length === 0 && venceAmanha.length === 0 && noPrazo.length === 0 && (
             <EmptyState icon={CheckCircle2} text="Nenhum produto ativo no momento." />
           )}
         </>

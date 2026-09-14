@@ -61,7 +61,9 @@ Deno.serve(async (req: Request) => {
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, serviceRoleKey);
 
-    const today = new Date().toISOString().slice(0, 10);
+    // Use Brazil timezone (UTC-3) to avoid date shifting
+    const nowBr = new Date(Date.now() - 3 * 60 * 60 * 1000);
+    const today = `${nowBr.getUTCFullYear()}-${String(nowBr.getUTCMonth() + 1).padStart(2, '0')}-${String(nowBr.getUTCDate()).padStart(2, '0')}`;
 
     // Find all restaurants that have validade alerts enabled
     const { data: settings, error: settingsError } = await supabase
