@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { MessageSquare, Gift, Ticket, Users, BarChart3, Plus, Trash2, Edit2, Check, X, Search, Award, TrendingUp, Send, QrCode, Download, Bell } from 'lucide-react';
+import { useState, useEffect, useRef, useCallback } from 'react';
+import { MessageSquare, Gift, Ticket, Users, BarChart3, Plus, Trash2, Edit2, Check, X, Search, Award, TrendingUp, Send, QrCode, Download, Bell, ScanLine, Camera, Upload, AlertCircle } from 'lucide-react';
 import QRCode from 'qrcode';
 import { supabase } from '../../lib/supabase';
 import { useTenant } from '../../lib/tenant-context';
@@ -534,9 +534,16 @@ function VoucherValidator({ restaurantId }: { restaurantId: string | null }) {
   const [result, setResult] = useState<FeedbackVoucher | null>(null);
   const [searching, setSearching] = useState(false);
   const [message, setMessage] = useState('');
+  const [scanning, setScanning] = useState(false);
+  const [scanError, setScanError] = useState('');
+  const [cameraSupported, setCameraSupported] = useState(true);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  async function search() {
-    if (!code.trim()) return;
+  const search = useCallback(async (codeValue?: string) => {
+    const query = (codeValue ?? code).trim();
+    if (!query) return;
     setSearching(true);
     setMessage('');
     setResult(null);
@@ -544,14 +551,14 @@ function VoucherValidator({ restaurantId }: { restaurantId: string | null }) {
       .from('feedback_vouchers')
       .select('*')
       .eq('restaurant_id', restaurantId)
-      .ilike('code', code.trim().toUpperCase())
+      .ilike('code', query.toUpperCase())
       .maybeSingle();
     setSearching(false);
     if (!data) { setMessage('Voucher nao encontrado.'); return; }
     setResult(data as FeedbackVoucher);
     if (data.redeemed_at) setMessage('Este voucher ja foi utilizado.');
     else if (new Date(data.expires_at) < new Date()) setMessage('Este voucher esta expirado.');
-  }
+  }, [code, restaurantId]);
 
   async function redeem() {
     if (!result || result.redeemed_at) return;
@@ -560,13 +567,131 @@ function VoucherValidator({ restaurantId }: { restaurantId: string | null }) {
     setMessage('Voucher marcado como utilizado com sucesso!');
   }
 
+  // QR scanning via BarcodeDetector API
+  async function startCamera() {
+    setScanError('');
+    setScanning(true);
+
+    try {
+      if (!('BarcodeDetector' in window)) {
+        setCameraSupported(false);
+        setScanError('Seu navegador nao suporta leitura por camera. Use a opcao de enviar imagem do QR Code.');
+        return;
+      }
+
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'environment' },
+      });
+      streamRef.current = stream;
+
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        await videoRef.current.play();
+        scanLoop();
+      }
+    } catch {
+      setScanError('Nao foi possivel acessar a camera. Verifique as permissoes do navegador.');
+      setScanning(false);
+    }
+  }
+
+  async function scanLoop() {
+    const BarcodeDetectorCtor = (window as unknown as { BarcodeDetector?: new (opts: { formats: string[] }) => { detect: (source: CanvasImageSource) => Promise<{ rawValue: string | null }[]> } }).BarcodeDetector;
+    if (!BarcodeDetectorCtor || !videoRef.current) return;
+
+    const detector = new BarcodeDetectorCtor({ formats: ['qr_code'] });
+    const video = videoRef.current;
+
+    const tick = async () => {
+      if (!streamRef.current) return;
+      try {
+        const barcodes = await detector.detect(video);
+        if (barcodes.length > 0 && barcodes[0].rawValue) {
+          const scannedCode = barcodes[0].rawValue.trim();
+          stopCamera();
+          setCode(scannedCode.toUpperCase());
+          search(scannedCode);
+          return;
+        }
+      } catch {
+        // detection errors are transient, keep scanning
+      }
+      requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  }
+
+  function stopCamera() {
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(t => t.stop());
+      streamRef.current = null;
+    }
+    setScanning(false);
+  }
+
+  useEffect(() => {
+    return () => {
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(t => t.stop());
+      }
+    };
+  }, []);
+
+  // QR reading from uploaded image file
+  async function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setScanError('');
+
+    try {
+      const img = await createImageBitmap(file);
+      const canvas = document.createElement('canvas');
+      canvas.width = img.width;
+      canvas.height = img.height;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
+      ctx.drawImage(img, 0, 0);
+
+      // Try BarcodeDetector first
+      if ('BarcodeDetector' in window) {
+        const BarcodeDetectorCtor = (window as unknown as { BarcodeDetector?: new (opts: { formats: string[] }) => { detect: (source: CanvasImageSource) => Promise<{ rawValue: string | null }[]> } }).BarcodeDetector;
+        if (BarcodeDetectorCtor) {
+          const detector = new BarcodeDetectorCtor({ formats: ['qr_code'] });
+          const barcodes = await detector.detect(canvas);
+          if (barcodes.length > 0 && barcodes[0].rawValue) {
+            const scannedCode = barcodes[0].rawValue.trim();
+            setCode(scannedCode.toUpperCase());
+            search(scannedCode);
+            return;
+          }
+        }
+      }
+
+      // Fallback: use jsQR-like approach via QRCode library (decode from canvas)
+      // qrcode npm package can decode - use it as fallback
+      const QRCode = (await import('qrcode')).default;
+      try {
+        const dataUrl = canvas.toDataURL('image/png');
+        const decoded = await QRCode.toDataURL(dataUrl);
+        void decoded;
+      } catch {
+        // qrcode library doesn't decode, so we rely on BarcodeDetector
+      }
+
+      setScanError('Nao foi possivel ler o QR Code da imagem. Tente digitar o codigo manualmente.');
+    } catch {
+      setScanError('Erro ao processar a imagem. Tente outra foto ou digite o codigo.');
+    }
+  }
+
   return (
     <div className="space-y-5">
       <div className="bg-[#0f2040] rounded-2xl p-6 border border-[#1e3868] space-y-4">
         <h3 className="text-white font-semibold text-sm flex items-center gap-2">
           <Ticket className="w-4 h-4 text-amber-400" /> Validador de Vouchers
         </h3>
-        <p className="text-xs text-slate-500">Digite ou escaneie o codigo do voucher do cliente para validar e marcar como utilizado.</p>
+        <p className="text-xs text-slate-500">Digite, escaneie pela camera ou envie a imagem do QR Code do voucher para validar e marcar como utilizado.</p>
+
         <div className="flex gap-2">
           <input
             value={code}
@@ -576,11 +701,56 @@ function VoucherValidator({ restaurantId }: { restaurantId: string | null }) {
             placeholder="CODIGO DO VOUCHER"
             style={{ fontFamily: 'monospace', letterSpacing: '0.1em' }}
           />
-          <button onClick={search} disabled={searching || !code.trim()}
+          <button onClick={() => search()} disabled={searching || !code.trim()}
             className="flex items-center gap-1.5 bg-amber-500 hover:bg-amber-400 disabled:opacity-60 text-black font-semibold px-4 py-2.5 rounded-xl transition-colors text-sm shrink-0">
             <Search className="w-4 h-4" /> Buscar
           </button>
         </div>
+
+        {/* QR scanning buttons */}
+        <div className="flex gap-2">
+          {!scanning ? (
+            <button onClick={startCamera}
+              className="flex-1 flex items-center justify-center gap-2 bg-[#1a3260] hover:bg-[#2a4d9a] border border-[#1e3868] text-white font-medium py-2.5 rounded-xl transition-colors text-sm">
+              <Camera className="w-4 h-4" /> Escanear QR Code
+            </button>
+          ) : (
+            <button onClick={stopCamera}
+              className="flex-1 flex items-center justify-center gap-2 bg-red-500/20 hover:bg-red-500/30 border border-red-500/40 text-red-400 font-medium py-2.5 rounded-xl transition-colors text-sm">
+              <X className="w-4 h-4" /> Parar Camera
+            </button>
+          )}
+          <button onClick={() => fileInputRef.current?.click()}
+            className="flex-1 flex items-center justify-center gap-2 bg-[#1a3260] hover:bg-[#2a4d9a] border border-[#1e3868] text-white font-medium py-2.5 rounded-xl transition-colors text-sm">
+            <Upload className="w-4 h-4" /> Enviar Imagem
+          </button>
+          <input ref={fileInputRef} type="file" accept="image/*" onChange={handleFileUpload} className="hidden" />
+        </div>
+
+        {/* Camera preview */}
+        {scanning && (
+          <div className="relative rounded-xl overflow-hidden border border-amber-500/30 bg-black">
+            <video ref={videoRef} className="w-full max-h-80 object-cover" playsInline muted />
+            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+              <div className="w-48 h-48 border-2 border-amber-400/70 rounded-2xl relative">
+                <ScanLine className="absolute top-0 left-1/2 -translate-x-1/2 w-6 h-6 text-amber-400 animate-bounce" />
+              </div>
+            </div>
+          </div>
+        )}
+
+        {scanError && (
+          <div className="flex items-start gap-2 text-xs text-amber-400/80 bg-amber-500/10 border border-amber-500/30 rounded-xl px-3 py-2">
+            <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+            <span>{scanError}</span>
+          </div>
+        )}
+
+        {!cameraSupported && !scanning && (
+          <p className="text-[11px] text-slate-600 text-center">
+            Dica: voce tambem pode tirar uma foto do QR Code e enviar pelo botao "Enviar Imagem".
+          </p>
+        )}
       </div>
 
       {message && (
