@@ -121,12 +121,14 @@ export default function FeedbackSurvey() {
   async function capturePushSubscription(leadId: string, sessionId: string) {
     try {
       if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
+      const vapidKey = import.meta.env.VITE_VAPID_PUBLIC_KEY;
+      if (!vapidKey) return;
       const permission = await Notification.requestPermission();
       if (permission !== 'granted') return;
       const reg = await navigator.serviceWorker.ready;
       const sub = await reg.pushManager.subscribe({
         userVisibleOnly: true,
-        applicationServerKey: urlBase64ToUint8Array(import.meta.env.VITE_VAPID_PUBLIC_KEY ?? ''),
+        applicationServerKey: urlBase64ToUint8Array(vapidKey),
       });
       const subJson = sub.toJSON();
       await supabase
@@ -145,6 +147,7 @@ export default function FeedbackSurvey() {
     } catch {
       // Push subscription is optional — silently ignore failures
     }
+    void sessionId;
   }
 
   function urlBase64ToUint8Array(base64: string): Uint8Array {
