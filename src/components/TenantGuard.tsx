@@ -96,6 +96,8 @@ const MODULE_LABELS: Record<string, string> = {
   gula_pedidos:    'Gula Pedidos',
   gula_fidelidade: 'Gula Fidelidade',
   gula_etiquetas:  'Gula Etiquetas',
+  gula_fila:       'Gula Fila',
+  gula_feedback:   'Gula Feedback',
 };
 
 export default function TenantGuard({ children, requiredModule, requireOwnership = false, bypassPaywall = false }: Props) {

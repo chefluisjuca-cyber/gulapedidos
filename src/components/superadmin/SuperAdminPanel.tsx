@@ -108,6 +108,8 @@ const MODULE_DEFS = [
   { id: MODULES.GULA_PEDIDOS,    label: 'Gula Pedidos Digital', color: 'amber',  desc: 'Cardápio digital + KDS + caixa' },
   { id: MODULES.GULA_FIDELIDADE, label: 'Gula Fidelidade',      color: 'teal',   desc: 'Pontos, cashback e recompensas' },
   { id: MODULES.GULA_ETIQUETAS,  label: 'Gula Etiquetas',       color: 'emerald', desc: 'Etiquetas de validade para segurança alimentar' },
+  { id: MODULES.GULA_FILA,       label: 'Gula Fila',            color: 'blue',    desc: 'Gestão de filas de espera e atendimento' },
+  { id: MODULES.GULA_FEEDBACK,  label: 'Gula Feedback',        color: 'rose',    desc: 'Pesquisa de satisfação + roleta de prêmios' },
 ] as const;
 
 const STATUS_META = {
@@ -117,10 +119,11 @@ const STATUS_META = {
 };
 
 const MODULE_COLOR: Record<string, { bg: string; text: string }> = {
-  amber: { bg: 'bg-amber-500/15',  text: 'text-amber-400'  },
-  teal:  { bg: 'bg-teal-500/15',   text: 'text-teal-400'   },
+  amber:   { bg: 'bg-amber-500/15',   text: 'text-amber-400'   },
+  teal:    { bg: 'bg-teal-500/15',    text: 'text-teal-400'    },
   blue:    { bg: 'bg-blue-500/15',    text: 'text-blue-400'    },
   emerald: { bg: 'bg-emerald-500/15', text: 'text-emerald-400' },
+  rose:    { bg: 'bg-rose-500/15',    text: 'text-rose-400'    },
 };
 
 function moduleBadgeStyle(moduleId: string) {
