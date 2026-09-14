@@ -40,6 +40,20 @@ Deno.serve(async (req: Request) => {
       );
     }
 
+    // Fetch VAPID keys from database
+    const { data: vapidData, error: vapidError } = await supabase
+      .from("push_vapid_keys")
+      .select("public_key, private_key, subject")
+      .eq("id", 1)
+      .maybeSingle();
+
+    if (vapidError || !vapidData) {
+      return new Response(
+        JSON.stringify({ error: "VAPID keys not configured in database" }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
     // Fetch all active push subscriptions for this restaurant
     const { data: leads, error: leadsError } = await supabase
       .from("feedback_leads")
@@ -62,28 +76,18 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    const vapidPublicKey = Deno.env.get("VAPID_PUBLIC_KEY");
-    const vapidPrivateKey = Deno.env.get("VAPID_PRIVATE_KEY");
-    const vapidSubject = Deno.env.get("VAPID_SUBJECT") ?? "mailto:contato@gula.com.br";
-
-    if (!vapidPublicKey || !vapidPrivateKey) {
-      return new Response(
-        JSON.stringify({ error: "VAPID keys not configured" }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-      );
-    }
-
     // Import web-push library
     const webPush = await import("npm:web-push@3.6.7");
 
     webPush.setVapidDetails(
-      vapidSubject,
-      vapidPublicKey,
-      vapidPrivateKey,
+      vapidData.subject,
+      vapidData.public_key,
+      vapidData.private_key,
     );
 
     const notificationTitle = restaurant.name;
-    const notificationUrl = `${Deno.env.get("SUPABASE_URL")?.replace(/\.supabase\.co\/?$/, "") ?? ""}/${restaurant.slug}`;
+    const origin = new URL(req.url).origin;
+    const notificationUrl = `${origin}/${restaurant.slug}`;
 
     let sent = 0;
     let failed = 0;
