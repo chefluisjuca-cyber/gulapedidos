@@ -5,6 +5,8 @@ import { supabase } from '../lib/supabase';
 import { TenantContext } from '../lib/tenant-context';
 import { Restaurant } from '../types';
 
+const STANDALONE_PLANS: string[] = ['gula_etiquetas_standalone', 'gula_fila_standalone', 'gula_feedback_standalone'];
+
 interface Props {
   children: ReactNode;
   requiredModule?: string;
@@ -140,7 +142,11 @@ export default function TenantGuard({ children, requiredModule, requireOwnership
           return;
         }
 
-        if (requiredModule && !r.modules.includes(requiredModule as never)) {
+        const isStandalonePlan = r.plan != null && STANDALONE_PLANS.includes(r.plan);
+        const trialActiveNow = r.status === 'trial' && (!r.trial_ends_at || new Date() < new Date(r.trial_ends_at));
+        const trialFullUnlock = trialActiveNow && !isStandalonePlan;
+
+        if (requiredModule && !trialFullUnlock && !r.modules.includes(requiredModule as never)) {
           setError('no_module'); setLoading(false); return;
         }
 
@@ -191,6 +197,8 @@ export default function TenantGuard({ children, requiredModule, requireOwnership
   const trialActive =
     restaurant?.status === 'trial' &&
     (!restaurant?.trial_ends_at || new Date() < new Date(restaurant.trial_ends_at));
+  const isStandalonePlan = restaurant?.plan != null && STANDALONE_PLANS.includes(restaurant.plan);
+  const trialFullUnlock = trialActive && !isStandalonePlan;
   const daysLeft = trialActive && restaurant?.trial_ends_at
     ? Math.max(0, Math.ceil((new Date(restaurant!.trial_ends_at!).getTime() - Date.now()) / (1000 * 60 * 60 * 24)))
     : 0;
@@ -199,7 +207,7 @@ export default function TenantGuard({ children, requiredModule, requireOwnership
     <TenantContext.Provider
       value={{
         restaurant,
-        hasModule: (m) => !restaurant || restaurant.modules.includes(m as never),
+        hasModule: (m) => !restaurant || trialFullUnlock || restaurant.modules.includes(m as never),
       }}
     >
       {trialActive && !bypassPaywall && (
