@@ -12,6 +12,7 @@ import BillingTab from './components/admin/BillingTab';
 import LandingPage from './components/LandingPage';
 import TutorialsPage from './components/TutorialsPage';
 import EtiquetasLanding from './components/EtiquetasLanding';
+import FeedbackLanding from './components/FeedbackLanding';
 import SelfSignup from './components/SelfSignup';
 import WelcomePage from './components/WelcomePage';
 import TenantGuard from './components/TenantGuard';
@@ -143,6 +144,7 @@ export default function App() {
           <Route path="/cadastrar" element={<SelfSignup />} />
           <Route path="/entrar" element={<WelcomePage />} />
           <Route path="/etiquetas" element={<EtiquetasLanding />} />
+          <Route path="/feedback" element={<FeedbackLanding />} />
           <Route path="/tutoriais" element={<TutorialsPage />} />
 
           {/* Blog — public (powered by Soro) */}

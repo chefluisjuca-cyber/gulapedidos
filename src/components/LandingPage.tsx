@@ -683,6 +683,13 @@ export default function LandingPage() {
                         {STANDALONE_ETIQUETAS_CARD.cta}
                         <ArrowRight className="w-4 h-4" />
                       </button>
+                      <button
+                        onClick={() => navigate('/etiquetas')}
+                        className="mt-3 w-full inline-flex items-center justify-center gap-1.5 text-sm font-medium px-5 py-2.5 rounded-xl bg-white border-2 border-emerald-200 text-emerald-700 hover:border-emerald-400 hover:bg-emerald-50 transition-all"
+                      >
+                        <ArrowUpRight className="w-4 h-4" />
+                        Conhecer Gula Etiquetas
+                      </button>
                       <p className="mt-3 text-xs text-slate-400 text-center">Sem cartão de crédito · Cancele quando quiser</p>
                     </>
                   );
@@ -749,6 +756,15 @@ export default function LandingPage() {
                         {STANDALONE_FILA_CARD.cta}
                         <ArrowRight className="w-4 h-4" />
                       </button>
+                      <a
+                        href="https://gulafila.com.br"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="mt-3 w-full inline-flex items-center justify-center gap-1.5 text-sm font-medium px-5 py-2.5 rounded-xl bg-white border-2 border-blue-200 text-blue-700 hover:border-blue-400 hover:bg-blue-50 transition-all"
+                      >
+                        <ArrowUpRight className="w-4 h-4" />
+                        Conhecer Gula Fila
+                      </a>
                       <p className="mt-3 text-xs text-slate-400 text-center">Sem cartão de crédito · Cancele quando quiser</p>
                     </>
                   );
@@ -817,6 +833,13 @@ export default function LandingPage() {
                       >
                         {STANDALONE_FEEDBACK_CARD.cta}
                         <ArrowRight className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => navigate('/feedback')}
+                        className="mt-3 w-full inline-flex items-center justify-center gap-1.5 text-sm font-medium px-5 py-2.5 rounded-xl bg-white border-2 border-amber-200 text-amber-700 hover:border-amber-400 hover:bg-amber-50 transition-all"
+                      >
+                        <ArrowUpRight className="w-4 h-4" />
+                        Conhecer Gula Feedback
                       </button>
                       <p className="mt-3 text-xs text-slate-400 text-center">Sem cartão de crédito · Cancele quando quiser</p>
                     </>
