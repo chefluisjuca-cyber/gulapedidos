@@ -199,9 +199,8 @@ export default function LandingPage() {
   const [cycle, setCycle] = useState<BillingCycle>('mensal');
   const [standaloneCycle, setStandaloneCycle] = useState<BillingCycle>('mensal');
 
-  function handlePlanClick(planId: RestaurantPlan, priceId?: string) {
-    const params = new URLSearchParams({ plan: planId });
-    if (priceId) params.set('price_id', priceId);
+  function handlePlanClick(planId: RestaurantPlan, cycle: BillingCycle) {
+    const params = new URLSearchParams({ plan: planId, cycle });
     navigate(`/cadastrar?${params.toString()}`);
   }
 
@@ -503,7 +502,6 @@ export default function LandingPage() {
             const variant = plan?.variants.find(v => v.tier === 'promo') ?? plan?.variants[0];
             const priceEntry = variant?.prices.find(p => p.cycle === cycle) ?? variant?.prices[0];
             const displayPrice = priceEntry?.price ?? card.priceNew;
-            const priceId = priceEntry?.stripe_price_id;
             const mensalPrice = variant?.prices.find(p => p.cycle === 'mensal')?.price;
             const months = cycle === 'semestral' ? 6 : cycle === 'anual' ? 12 : 1;
             const savings = cycle !== 'mensal' && mensalPrice ? (mensalPrice - displayPrice) * months : 0;
@@ -567,7 +565,7 @@ export default function LandingPage() {
               </ul>
 
               <button
-                onClick={() => handlePlanClick(card.planId, priceId)}
+                onClick={() => handlePlanClick(card.planId, cycle)}
                 className={`w-full inline-flex items-center justify-center gap-2 text-sm font-semibold px-5 py-3.5 rounded-xl transition-all ${
                   card.highlighted
                     ? 'bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white shadow-lg shadow-amber-500/30 hover:-translate-y-0.5'
@@ -660,7 +658,6 @@ export default function LandingPage() {
                   const etiqMonths = standaloneCycle === 'semestral' ? 6 : standaloneCycle === 'anual' ? 12 : 1;
                   const etiqSavings = standaloneCycle !== 'mensal' && etiqMensalPrice ? (etiqMensalPrice - etiqPrice) * etiqMonths : 0;
                   const etiqPrefix = standaloneCycle === 'semestral' ? '6x de ' : standaloneCycle === 'anual' ? '12x de ' : '';
-                  const etiqPriceId = etiqEntry?.stripe_price_id;
                   return (
                     <>
                       <div className="mb-4">
@@ -677,7 +674,7 @@ export default function LandingPage() {
                         <span className="text-xs text-emerald-600 font-medium block mt-1">7 dias grátis para testar</span>
                       </div>
                       <button
-                        onClick={() => handlePlanClick(STANDALONE_ETIQUETAS_CARD.planId, etiqPriceId)}
+                        onClick={() => handlePlanClick(STANDALONE_ETIQUETAS_CARD.planId, standaloneCycle)}
                         className="w-full inline-flex items-center justify-center gap-2 text-sm font-semibold px-5 py-3.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white shadow-lg shadow-emerald-500/30 hover:-translate-y-0.5 transition-all"
                       >
                         {STANDALONE_ETIQUETAS_CARD.cta}
@@ -733,7 +730,6 @@ export default function LandingPage() {
                   const filaMonths = standaloneCycle === 'semestral' ? 6 : standaloneCycle === 'anual' ? 12 : 1;
                   const filaSavings = standaloneCycle !== 'mensal' && filaMensalPrice ? (filaMensalPrice - filaPrice) * filaMonths : 0;
                   const filaPrefix = standaloneCycle === 'semestral' ? '6x de ' : standaloneCycle === 'anual' ? '12x de ' : '';
-                  const filaPriceId = filaEntry?.stripe_price_id;
                   return (
                     <>
                       <div className="mb-4">
@@ -750,7 +746,7 @@ export default function LandingPage() {
                         <span className="text-xs text-blue-600 font-medium block mt-1">7 dias grátis para testar</span>
                       </div>
                       <button
-                        onClick={() => handlePlanClick(STANDALONE_FILA_CARD.planId, filaPriceId)}
+                        onClick={() => handlePlanClick(STANDALONE_FILA_CARD.planId, standaloneCycle)}
                         className="w-full inline-flex items-center justify-center gap-2 text-sm font-semibold px-5 py-3.5 rounded-xl bg-gradient-to-r from-blue-600 to-sky-600 hover:from-blue-700 hover:to-sky-700 text-white shadow-lg shadow-blue-500/30 hover:-translate-y-0.5 transition-all"
                       >
                         {STANDALONE_FILA_CARD.cta}
@@ -808,7 +804,6 @@ export default function LandingPage() {
                   const fbMonths = standaloneCycle === 'semestral' ? 6 : standaloneCycle === 'anual' ? 12 : 1;
                   const fbSavings = standaloneCycle !== 'mensal' && fbMensalPrice ? (fbMensalPrice - fbPrice) * fbMonths : 0;
                   const fbPrefix = standaloneCycle === 'semestral' ? '6x de ' : standaloneCycle === 'anual' ? '12x de ' : '';
-                  const fbPriceId = fbEntry?.stripe_price_id;
                   return (
                     <>
                       <div className="mb-4">
@@ -828,7 +823,7 @@ export default function LandingPage() {
                         <span className="text-xs text-amber-600 font-medium block mt-1">7 dias grátis para testar</span>
                       </div>
                       <button
-                        onClick={() => handlePlanClick(STANDALONE_FEEDBACK_CARD.planId, fbPriceId)}
+                        onClick={() => handlePlanClick(STANDALONE_FEEDBACK_CARD.planId, standaloneCycle)}
                         className="w-full inline-flex items-center justify-center gap-2 text-sm font-semibold px-5 py-3.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white shadow-lg shadow-amber-500/30 hover:-translate-y-0.5 transition-all"
                       >
                         {STANDALONE_FEEDBACK_CARD.cta}

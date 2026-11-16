@@ -1,0 +1,69 @@
+{
+  "projectId": "67987461",
+  "functions": {
+    "ai-validade": {
+      "hasChanged": false,
+      "hash": "b6b79a539ca625ad378ca7a579d4d16db848bea1897fd5e1b146e072936d7f3a"
+    },
+    "ai-validade-chat": {
+      "hasChanged": false,
+      "hash": "428f8526e397dbf282eea0f2cc8831e1ea7a422dab0dab21667bdad69ec9b264"
+    },
+    "create-auth-user": {
+      "hasChanged": false,
+      "hash": "75ea86cf41ce6f460139137d0ebb0c8ded6583dac888d153848b7fc91c504b66"
+    },
+    "ifood-webhook": {
+      "hasChanged": false,
+      "hash": "681e2598dd09e907aa3e6c0548d415282c90490d9824df76d3ad49232e2481e5"
+    },
+    "knowledge-base-chat": {
+      "hasChanged": false,
+      "hash": "ed2f97d26777498bbb23cff6d218a899fc88394511bd70d868132e7cf6919f87"
+    },
+    "mercadopago-create-payment": {
+      "hasChanged": false,
+      "hash": "099bae12e8973e18795c8246aa79701700d748d82863b9974d7982c371f04591"
+    },
+    "mercadopago-webhook": {
+      "hasChanged": false,
+      "hash": "dfe712373e4b069729a5e22503f202313ef2311d9057b8c85a3943cdcd03346c"
+    },
+    "print-agent": {
+      "hasChanged": false,
+      "hash": "043fffc105e46466829023853f2199251a1205391b9a9383ea800cf130735269"
+    },
+    "restaurant-signup": {
+      "hasChanged": false,
+      "hash": "f8ed92430af4bc63d5a7c101182b7c621c52a26d92cab2a674614e697d8e96f8"
+    },
+    "send-mass-push": {
+      "hasChanged": false,
+      "hash": "04885c848fb8e070062a8b761e633da87fb44629ad08a6374845c0be296c549d"
+    },
+    "trial-onboarding": {
+      "hasChanged": false,
+      "hash": "6a92583fa7f85bc2de1613a598c9c2252ed20d7b67f47c1b118a207c7599d9ce"
+    },
+    "validade-alert": {
+      "hasChanged": false,
+      "hash": "509f5c16f1928fdf2fda751b7f36e0a86551855751821c27430d810073362f95"
+    },
+    "whatsapp-send": {
+      "hasChanged": false,
+      "hash": "b88186f4c2e25bd85bf85ba2df42ad945cdaa868c03bb66a87d95039d89cb778"
+    },
+    "create-mp-subscription": {
+      "hasChanged": false,
+      "hash": "8f9cf40d1b2b9b16b01066b019f36e10a9eff294c55c3c6f964f35ebc83fa946"
+    },
+    "mp-cancel-subscription": {
+      "hasChanged": false,
+      "hash": "1f4e1a9870d314c2dd32484a8c9232c6422070ec239b97d59d997fac4d3cf251"
+    },
+    "mp-subscription-webhook": {
+      "hasChanged": false,
+      "hash": "9cc2634c12d43d336fb5d156ebcccf3e5b448ca41490504a99298a1fc7553466"
+    }
+  }
+}

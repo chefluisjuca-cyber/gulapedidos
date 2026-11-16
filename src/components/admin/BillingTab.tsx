@@ -1,13 +1,20 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Check, Clock, Lock, Loader2, ArrowLeft, Sparkles, Zap } from 'lucide-react';
+import { Check, Clock, Lock, Loader2, ArrowLeft, Sparkles, Zap, XCircle } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
-import { PLANS, Restaurant, RestaurantPlan, PlanVariant } from '../../types';
+import { PLANS, Restaurant, RestaurantPlan, PlanVariant, BillingCycle, PLAN_TYPE_BY_PLAN, MP_CYCLE_BY_BILLING } from '../../types';
 
 const MODULE_LABELS: Record<string, string> = {
   gula_pedidos: 'Gula Pedidos',
   gula_fidelidade: 'Gula Fidelidade',
   gula_etiquetas: 'Gula Etiquetas',
+};
+
+const SUBSCRIPTION_STATUS_LABELS: Record<string, { label: string; cls: string }> = {
+  trialing: { label: 'Em teste grátis', cls: 'bg-amber-500/15 text-amber-300 border-amber-500/30' },
+  active: { label: 'Ativa', cls: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30' },
+  past_due: { label: 'Pagamento pendente', cls: 'bg-red-500/15 text-red-300 border-red-500/30' },
+  canceled: { label: 'Cancelada', cls: 'bg-slate-500/15 text-slate-300 border-slate-500/30' },
 };
 
 function formatBRL(value: number) {
@@ -36,6 +43,7 @@ export default function BillingTab() {
   const [restaurant, setRestaurant] = useState<Restaurant | null>(null);
   const [loading, setLoading] = useState(true);
   const [redirecting, setRedirecting] = useState<string | null>(null);
+  const [canceling, setCanceling] = useState(false);
   const [tier, setTier] = useState<Tier>('promo');
 
   useEffect(() => {
@@ -51,29 +59,65 @@ export default function BillingTab() {
       });
   }, [slug]);
 
-  async function handleSubscribe(planId: RestaurantPlan, priceId: string) {
-    if (!slug) return;
-    setRedirecting(priceId);
+  async function handleSubscribe(planId: RestaurantPlan, cycle: BillingCycle) {
+    if (!slug || !restaurant) return;
+    const key = `${planId}-${cycle}`;
+    setRedirecting(key);
     try {
-      const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/stripe-checkout`;
+      const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-mp-subscription`;
       const res = await fetch(apiUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
         },
-        body: JSON.stringify({ price_id: priceId, slug, customer_email: restaurant?.owner_email }),
+        body: JSON.stringify({
+          restaurant_id: restaurant.id,
+          plan_type: PLAN_TYPE_BY_PLAN[planId],
+          billing_cycle: MP_CYCLE_BY_BILLING[cycle],
+          payer_email: restaurant.owner_email,
+        }),
       });
-      if (!res.ok) throw new Error(`Falha ao iniciar checkout (${res.status})`);
+      if (!res.ok) {
+        const errBody = await res.json().catch(() => ({}));
+        throw new Error(errBody.error ?? `Falha ao iniciar checkout (${res.status})`);
+      }
       const data = await res.json();
-      if (data.url) {
-        window.location.href = data.url;
+      if (data.init_point) {
+        window.location.href = data.init_point;
         return;
       }
       throw new Error('URL de checkout não retornada');
     } catch (err) {
       alert(err instanceof Error ? err.message : 'Erro ao redirecionar para o pagamento');
       setRedirecting(null);
+    }
+  }
+
+  async function handleCancelSubscription() {
+    if (!restaurant || !slug) return;
+    if (!confirm('Deseja realmente cancelar sua assinatura? O acesso ao sistema será encerrado.')) return;
+    setCanceling(true);
+    try {
+      const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/mp-cancel-subscription`;
+      const res = await fetch(apiUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+        },
+        body: JSON.stringify({ restaurant_id: restaurant.id }),
+      });
+      if (!res.ok) {
+        const errBody = await res.json().catch(() => ({}));
+        throw new Error(errBody.error ?? `Falha ao cancelar (${res.status})`);
+      }
+      setRestaurant({ ...restaurant, subscription_status: 'canceled', status: 'suspended' });
+      alert('Assinatura cancelada com sucesso.');
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Erro ao cancelar assinatura');
+    } finally {
+      setCanceling(false);
     }
   }
 
@@ -102,6 +146,12 @@ export default function BillingTab() {
   const isTrialActive = restaurant.status === 'trial' && daysLeft !== null && daysLeft > 0;
 
   const hasMultipleVariants = PLANS.some((p) => p.variants.length > 1);
+  const hasSubscription = !!restaurant.mp_preapproval_id;
+  const subStatus = SUBSCRIPTION_STATUS_LABELS[restaurant.subscription_status ?? ''];
+  const periodEnd = restaurant.current_period_end
+    ? new Date(restaurant.current_period_end).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' })
+    : null;
+  const cycleLabel: Record<string, string> = { monthly: 'Mensal', semiannual: 'Semestral', annual: 'Anual' };
 
   return (
     <div className="min-h-screen bg-slate-950">
@@ -161,6 +211,39 @@ export default function BillingTab() {
             <p className="text-slate-400 text-sm">
               {PLANS.find((p) => p.id === restaurant.plan)?.name ?? 'Plano contratado'}
             </p>
+          </div>
+        )}
+
+        {/* Mercado Pago subscription status */}
+        {hasSubscription && (
+          <div className="mb-8 rounded-2xl border border-slate-800 bg-slate-900/50 p-6">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+              <div>
+                <div className="flex items-center gap-2.5 mb-2">
+                  <h2 className="text-base font-bold text-white">Assinatura Mercado Pago</h2>
+                  {subStatus && (
+                    <span className={`inline-flex px-2.5 py-0.5 rounded-full border text-[11px] font-bold ${subStatus.cls}`}>
+                      {subStatus.label}
+                    </span>
+                  )}
+                </div>
+                <p className="text-xs text-slate-400">
+                  {restaurant.plan_type && `Plano: ${restaurant.plan_type}`}
+                  {restaurant.billing_cycle && ` • Ciclo: ${cycleLabel[restaurant.billing_cycle] ?? restaurant.billing_cycle}`}
+                  {periodEnd && ` • Próxima renovação: ${periodEnd}`}
+                </p>
+              </div>
+              {restaurant.subscription_status !== 'canceled' && (
+                <button
+                  onClick={handleCancelSubscription}
+                  disabled={canceling}
+                  className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold bg-red-500/10 border border-red-500/30 text-red-300 hover:bg-red-500/20 transition-all disabled:opacity-50 shrink-0"
+                >
+                  {canceling ? <Loader2 className="w-4 h-4 animate-spin" /> : <XCircle className="w-4 h-4" />}
+                  Cancelar Assinatura
+                </button>
+              )}
+            </div>
           </div>
         )}
 
@@ -248,37 +331,40 @@ export default function BillingTab() {
 
                 {/* Prices */}
                 <div className="space-y-2.5 mt-auto">
-                  {variant?.prices.map((price) => (
-                    <button
-                      key={price.stripe_price_id}
-                      disabled={isCurrent || redirecting !== null}
-                      onClick={() => handleSubscribe(plan.id, price.stripe_price_id)}
-                      className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-medium transition-all ${
-                        isCurrent
-                          ? 'bg-slate-800 text-slate-500 cursor-not-allowed'
-                          : redirecting === price.stripe_price_id
-                          ? 'bg-amber-500/20 text-amber-300 cursor-wait'
-                          : 'bg-amber-500 hover:bg-amber-400 text-slate-950 hover:shadow-lg hover:shadow-amber-500/20'
-                      }`}
-                    >
-                      <span className="flex items-center gap-2">
-                        {redirecting === price.stripe_price_id ? (
-                          <Loader2 className="w-4 h-4 animate-spin" />
-                        ) : isCurrent ? (
-                          <Check className="w-4 h-4" />
-                        ) : (
-                          <Sparkles className="w-4 h-4" />
-                        )}
-                        {price.label}
-                      </span>
-                      <span>
-                        {formatBRL(price.price)}
-                        {cycleSuffix(price.cycle) && (
-                          <span className="text-xs opacity-70">{cycleSuffix(price.cycle)}</span>
-                        )}
-                      </span>
-                    </button>
-                  ))}
+                  {variant?.prices.map((price) => {
+                    const key = `${plan.id}-${price.cycle}`;
+                    return (
+                      <button
+                        key={price.cycle}
+                        disabled={isCurrent || redirecting !== null}
+                        onClick={() => handleSubscribe(plan.id, price.cycle)}
+                        className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-medium transition-all ${
+                          isCurrent
+                            ? 'bg-slate-800 text-slate-500 cursor-not-allowed'
+                            : redirecting === key
+                            ? 'bg-amber-500/20 text-amber-300 cursor-wait'
+                            : 'bg-amber-500 hover:bg-amber-400 text-slate-950 hover:shadow-lg hover:shadow-amber-500/20'
+                        }`}
+                      >
+                        <span className="flex items-center gap-2">
+                          {redirecting === key ? (
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                          ) : isCurrent ? (
+                            <Check className="w-4 h-4" />
+                          ) : (
+                            <Sparkles className="w-4 h-4" />
+                          )}
+                          {price.label}
+                        </span>
+                        <span>
+                          {formatBRL(price.price)}
+                          {cycleSuffix(price.cycle) && (
+                            <span className="text-xs opacity-70">{cycleSuffix(price.cycle)}</span>
+                          )}
+                        </span>
+                      </button>
+                    );
+                  })}
                 </div>
                 {isCurrent && (
                   <p className="text-center text-xs text-emerald-400 mt-3">Plano atualmente ativo</p>
@@ -289,7 +375,7 @@ export default function BillingTab() {
         </div>
 
         <p className="text-center text-xs text-slate-600 mt-8">
-          Pagamento processado com segurança via Stripe. Cancele quando quiser.
+          Pagamento processado com segurança via Mercado Pago. Cancele quando quiser.
         </p>
       </div>
     </div>

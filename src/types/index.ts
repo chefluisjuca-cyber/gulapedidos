@@ -20,6 +20,12 @@ export interface Restaurant {
   modules: ModuleKey[];
   trial_ends_at: string | null;
   plan: RestaurantPlan | null;
+  mp_preapproval_id: string | null;
+  mp_payer_id: string | null;
+  subscription_status: 'trialing' | 'active' | 'past_due' | 'canceled' | null;
+  plan_type: 'essencial' | 'profissional' | 'premium' | 'etiquetas' | 'fila' | 'feedback' | null;
+  billing_cycle: 'monthly' | 'semiannual' | 'annual' | null;
+  current_period_end: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -32,7 +38,6 @@ export interface PlanPrice {
   cycle: BillingCycle;
   label: string;
   price: number;
-  stripe_price_id: string;
 }
 
 export interface PlanVariant {
@@ -68,18 +73,18 @@ export const PLANS: PlanDefinition[] = [
         tier: 'promo',
         label: 'Promocional',
         prices: [
-          { cycle: 'mensal',    label: 'Mensal',    price:  69.99, stripe_price_id: 'price_1U1Wf5RNhmPZU507wUTBXNij' },
-          { cycle: 'semestral', label: 'Semestral', price:  62.99, stripe_price_id: 'price_1UAYfDRNhmPZU507tjFn3L1C' },
-          { cycle: 'anual',     label: 'Anual',     price:  55.99, stripe_price_id: 'price_1UAYgWRNhmPZU507dqQISm3W' },
+          { cycle: 'mensal',    label: 'Mensal',    price:  69.99 },
+          { cycle: 'semestral', label: 'Semestral', price:  62.99 },
+          { cycle: 'anual',     label: 'Anual',     price:  55.99 },
         ],
       },
       {
         tier: 'regular',
         label: 'Essencial',
         prices: [
-          { cycle: 'mensal',    label: 'Mensal',    price:  69.99, stripe_price_id: 'price_1U1Wf5RNhmPZU507wUTBXNij' },
-          { cycle: 'semestral', label: 'Semestral', price: 372.00, stripe_price_id: 'price_1Tuz5ORNhmPZU507VknLWyOF' },
-          { cycle: 'anual',     label: 'Anual',     price: 649.00, stripe_price_id: 'price_1Tuz89RNhmPZU5070NrP6qzJ' },
+          { cycle: 'mensal',    label: 'Mensal',    price:  69.99 },
+          { cycle: 'semestral', label: 'Semestral', price: 372.00 },
+          { cycle: 'anual',     label: 'Anual',     price: 649.00 },
         ],
       },
     ],
@@ -101,18 +106,18 @@ export const PLANS: PlanDefinition[] = [
         tier: 'promo',
         label: 'Promocional',
         prices: [
-          { cycle: 'mensal',    label: 'Mensal',    price:  99.99, stripe_price_id: 'price_1TuzdHRNhmPZU507rVBBE8I1' },
-          { cycle: 'semestral', label: 'Semestral', price:  89.99, stripe_price_id: 'price_1UAYsURNhmPZU507wlqcehA0' },
-          { cycle: 'anual',     label: 'Anual',     price:  79.99, stripe_price_id: 'price_1UAYuhRNhmPZU50716OMAKIG' },
+          { cycle: 'mensal',    label: 'Mensal',    price:  99.99 },
+          { cycle: 'semestral', label: 'Semestral', price:  89.99 },
+          { cycle: 'anual',     label: 'Anual',     price:  79.99 },
         ],
       },
       {
         tier: 'regular',
         label: 'Padrão',
         prices: [
-          { cycle: 'mensal',    label: 'Mensal',    price:  99.00, stripe_price_id: 'price_1TuywTRNhmPZU507B54lpCTF' },
-          { cycle: 'semestral', label: 'Semestral', price: 530.00, stripe_price_id: 'price_1TuzA3RNhmPZU507T9E5KJ8M' },
-          { cycle: 'anual',     label: 'Anual',     price: 950.00, stripe_price_id: 'price_1Tuz9KRNhmPZU507Ovdijldz' },
+          { cycle: 'mensal',    label: 'Mensal',    price:  99.00 },
+          { cycle: 'semestral', label: 'Semestral', price: 530.00 },
+          { cycle: 'anual',     label: 'Anual',     price: 950.00 },
         ],
       },
     ],
@@ -134,9 +139,9 @@ export const PLANS: PlanDefinition[] = [
         tier: 'promo',
         label: 'Promocional',
         prices: [
-          { cycle: 'mensal',    label: 'Mensal',    price: 139.99, stripe_price_id: 'price_1Tuz2tRNhmPZU5079NY2GmLc' },
-          { cycle: 'semestral', label: 'Semestral', price: 125.99, stripe_price_id: 'price_1UAYwqRNhmPZU507jzoVedPS' },
-          { cycle: 'anual',     label: 'Anual',     price: 111.99, stripe_price_id: 'price_1UAYy4RNhmPZU5076kRQPZTT' },
+          { cycle: 'mensal',    label: 'Mensal',    price: 139.99 },
+          { cycle: 'semestral', label: 'Semestral', price: 125.99 },
+          { cycle: 'anual',     label: 'Anual',     price: 111.99 },
         ],
       },
     ],
@@ -159,9 +164,9 @@ export const PLANS: PlanDefinition[] = [
         tier: 'promo',
         label: 'Avulso',
         prices: [
-          { cycle: 'mensal',    label: 'Mensal',    price:  39.99, stripe_price_id: 'price_1U1XvRRNhmPZU507MjkznLVg' },
-          { cycle: 'semestral', label: 'Semestral', price:  35.99, stripe_price_id: 'price_1UAZFMRNhmPZU507EQN9orkH' },
-          { cycle: 'anual',     label: 'Anual',     price:  31.99, stripe_price_id: 'price_1UAZGHRNhmPZU507BxrR98yR' },
+          { cycle: 'mensal',    label: 'Mensal',    price:  39.99 },
+          { cycle: 'semestral', label: 'Semestral', price:  35.99 },
+          { cycle: 'anual',     label: 'Anual',     price:  31.99 },
         ],
       },
     ],
@@ -183,9 +188,9 @@ export const PLANS: PlanDefinition[] = [
         tier: 'promo',
         label: 'Avulso',
         prices: [
-          { cycle: 'mensal',    label: 'Mensal',    price:  49.99, stripe_price_id: 'price_1TxU1ERNhmPZU507Ev3MmGbz' },
-          { cycle: 'semestral', label: 'Semestral', price:  44.99, stripe_price_id: 'price_1UAZACRNhmPZU507qmwmBOWT' },
-          { cycle: 'anual',     label: 'Anual',     price:  39.99, stripe_price_id: 'price_1UAZAyRNhmPZU507jloLrvru' },
+          { cycle: 'mensal',    label: 'Mensal',    price:  49.99 },
+          { cycle: 'semestral', label: 'Semestral', price:  44.99 },
+          { cycle: 'anual',     label: 'Anual',     price:  39.99 },
         ],
       },
     ],
@@ -208,24 +213,30 @@ export const PLANS: PlanDefinition[] = [
         tier: 'promo',
         label: 'Avulso',
         prices: [
-          { cycle: 'mensal',    label: 'Mensal',    price:  29.99, stripe_price_id: 'price_1U55mzRNhmPZU5073LPQtsDa' },
-          { cycle: 'semestral', label: 'Semestral', price:  26.99, stripe_price_id: 'price_1UAYXbRNhmPZU507Qyitws9F' },
-          { cycle: 'anual',     label: 'Anual',     price:  23.99, stripe_price_id: 'price_1UAYUNRNhmPZU507lcGxypJM' },
+          { cycle: 'mensal',    label: 'Mensal',    price:  29.99 },
+          { cycle: 'semestral', label: 'Semestral', price:  26.99 },
+          { cycle: 'anual',     label: 'Anual',     price:  23.99 },
         ],
       },
     ],
   },
 ];
 
-export const PLAN_BY_STRIPE_PRICE: Record<string, RestaurantPlan> = PLANS.reduce(
-  (acc, plan) => {
-    for (const variant of plan.variants) {
-      for (const p of variant.prices) acc[p.stripe_price_id] = plan.id;
-    }
-    return acc;
-  },
-  {} as Record<string, RestaurantPlan>,
-);
+// Mercado Pago plan_type (edge function contract) per app plan id
+export const PLAN_TYPE_BY_PLAN: Record<RestaurantPlan, 'essencial' | 'profissional' | 'premium' | 'etiquetas' | 'fila' | 'feedback'> = {
+  essencial: 'essencial',
+  pedidos_fidelidade: 'profissional',
+  pedidos_fidelidade_etiquetas: 'premium',
+  gula_etiquetas_standalone: 'etiquetas',
+  gula_fila_standalone: 'fila',
+  gula_feedback_standalone: 'feedback',
+};
+
+export const MP_CYCLE_BY_BILLING: Record<BillingCycle, 'monthly' | 'semiannual' | 'annual'> = {
+  mensal: 'monthly',
+  semestral: 'semiannual',
+  anual: 'annual',
+};
 
 export interface DeliveryKmZone {
   from: number;
