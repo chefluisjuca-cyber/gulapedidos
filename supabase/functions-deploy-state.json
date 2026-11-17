@@ -13,6 +13,10 @@
       "hasChanged": false,
       "hash": "75ea86cf41ce6f460139137d0ebb0c8ded6583dac888d153848b7fc91c504b66"
     },
+    "create-mp-subscription": {
+      "hasChanged": false,
+      "hash": "8f9cf40d1b2b9b16b01066b019f36e10a9eff294c55c3c6f964f35ebc83fa946"
+    },
     "ifood-webhook": {
       "hasChanged": false,
       "hash": "681e2598dd09e907aa3e6c0548d415282c90490d9824df76d3ad49232e2481e5"
@@ -28,6 +32,14 @@
     "mercadopago-webhook": {
       "hasChanged": false,
       "hash": "dfe712373e4b069729a5e22503f202313ef2311d9057b8c85a3943cdcd03346c"
+    },
+    "mp-cancel-subscription": {
+      "hasChanged": false,
+      "hash": "1f4e1a9870d314c2dd32484a8c9232c6422070ec239b97d59d997fac4d3cf251"
+    },
+    "mp-subscription-webhook": {
+      "hasChanged": false,
+      "hash": "47bacdbb66ba3652321c87cd7dc7d6c6c4b56d7ff81c98d35851653f9fd4447f"
     },
     "print-agent": {
       "hasChanged": false,
@@ -52,18 +64,6 @@
     "whatsapp-send": {
       "hasChanged": false,
       "hash": "b88186f4c2e25bd85bf85ba2df42ad945cdaa868c03bb66a87d95039d89cb778"
-    },
-    "create-mp-subscription": {
-      "hasChanged": false,
-      "hash": "8f9cf40d1b2b9b16b01066b019f36e10a9eff294c55c3c6f964f35ebc83fa946"
-    },
-    "mp-cancel-subscription": {
-      "hasChanged": false,
-      "hash": "1f4e1a9870d314c2dd32484a8c9232c6422070ec239b97d59d997fac4d3cf251"
-    },
-    "mp-subscription-webhook": {
-      "hasChanged": false,
-      "hash": "9cc2634c12d43d336fb5d156ebcccf3e5b448ca41490504a99298a1fc7553466"
     }
   }
 }

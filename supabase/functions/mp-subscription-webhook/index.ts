@@ -1,6 +1,44 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
 
+async function hmacSha256Hex(secret: string, payload: string): Promise<string> {
+  const key = await crypto.subtle.importKey(
+    "raw",
+    new TextEncoder().encode(secret),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"],
+  );
+  const sig = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(payload));
+  return Array.from(new Uint8Array(sig)).map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+// Validate the x-signature header per Mercado Pago docs:
+// manifest = "id:{dataId};request-id:{xRequestId};ts:{ts};" and v1 must match an HMAC-SHA256 hex digest.
+async function verifyMpSignature(
+  req: Request,
+  dataId: string | null,
+  secret: string,
+): Promise<boolean> {
+  const xSignature = req.headers.get("x-signature");
+  if (!xSignature || !secret) return false;
+
+  const parts = Object.fromEntries(
+    xSignature.split(";").map((p) => {
+      const idx = p.indexOf("=");
+      return idx === -1 ? [p.trim(), ""] : [p.slice(0, idx).trim(), p.slice(idx + 1).trim()];
+    }),
+  );
+  const ts = parts["ts"];
+  const hashes = (parts["v1"] ?? "").split(",").map((h) => h.trim());
+  if (!ts || hashes.length === 0) return false;
+
+  const requestId = req.headers.get("x-request-id") ?? "";
+  const manifest = `id:${dataId ?? ""};request-id:${requestId};ts:${ts};`;
+  const computed = await hmacSha256Hex(secret, manifest);
+  return hashes.includes(computed);
+}
+
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
@@ -65,6 +103,20 @@ Deno.serve(async (req: Request) => {
     const body = await req.json() as WebhookBody;
     const topic = body.type ?? body.topic ?? "";
     const preapprovalId = body.data?.id ?? null;
+
+    const webhookSecret = (Deno.env.get("MERCADO_PAGO_WEBHOOK_SECRET") || "").trim();
+    if (webhookSecret) {
+      const signatureValid = await verifyMpSignature(req, preapprovalId, webhookSecret);
+      if (!signatureValid) {
+        console.warn("mp-subscription-webhook: invalid or missing x-signature, ignoring");
+        return new Response(JSON.stringify({ error: "Invalid signature" }), {
+          status: 401,
+          headers: { "Content-Type": "application/json", ...corsHeaders },
+        });
+      }
+    } else {
+      console.warn("mp-subscription-webhook: MERCADO_PAGO_WEBHOOK_SECRET not set, skipping signature check");
+    }
 
     // Only handle subscription and payment topics
     if (!topic.includes("subscription_preapproval") || !preapprovalId) {
@@ -142,12 +194,13 @@ Deno.serve(async (req: Request) => {
 
     const update: Record<string, unknown> = {
       subscription_status: newStatus,
-      mp_payer_id: preapproval.payer_id !== undefined ? String(preapproval.payer_id) : undefined,
+      mp_preapproval_id: preapprovalId,
       updated_at: now,
     };
 
     if (newStatus === "active") {
       update.status = "active";
+      update.mp_payer_id = preapproval.payer_id !== undefined ? String(preapproval.payer_id) : undefined;
       if (nextPaymentDate) update.current_period_end = nextPaymentDate;
       if (externalRef.plan_type) update.plan_type = externalRef.plan_type;
       if (externalRef.billing_cycle) update.billing_cycle = externalRef.billing_cycle;
