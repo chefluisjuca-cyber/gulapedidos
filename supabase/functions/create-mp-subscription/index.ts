@@ -17,8 +17,8 @@ interface CreateSubPayload {
 // Base monthly prices (BRL)
 const PLAN_PRICES: Record<string, number> = {
   essencial: 69.99,
-  profissional: 99.99,
-  premium: 139.99,
+  profissional: 69.99,
+  premium: 99.99,
   etiquetas: 39.99,
   fila: 49.99,
   feedback: 29.99,

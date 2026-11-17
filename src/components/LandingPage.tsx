@@ -22,7 +22,7 @@ const FAQ_ITEMS = [
   },
   {
     q: 'Posso assinar apenas o módulo de pedidos?',
-    a: 'Sim! O Plano Essencial inclui exatamente isso: o Cardápio Digital + Monitor de Cozinha. Os módulos de Fidelidade (Plano Profissional) e Etiquetas de Validade (Plano Premium) são add-ons que você pode adicionar a qualquer momento, sem migrar de plataforma.',
+    a: 'O plano Profissional já inclui o Cardápio Digital + Monitor de Cozinha + Gula Fidelidade em um único plano. O módulo de Etiquetas de Validade (Plano Premium) pode ser adicionado a qualquer momento, sem migrar de plataforma.',
   },
   {
     q: 'Posso contratar apenas o módulo de etiquetas, sem o sistema de pedidos?',
@@ -48,35 +48,19 @@ const FAQ_ITEMS = [
 
 const PRICING_CARDS = [
   {
-    planId: 'essencial' as RestaurantPlan,
-    name: 'Essencial',
-    badge: null,
+    planId: 'pedidos_fidelidade' as RestaurantPlan,
+    name: 'Profissional',
+    badge: 'Melhor Custo-Benefício',
     priceOld: 99,
     priceNew: 69.99,
-    description: 'Ideal para organizar a produção, gerenciar o salão e receber pedidos de delivery no seu próprio web app sem comissões.',
+    description: 'Tudo em um só plano: pedidos, delivery, fidelidade e mais — sem comissões.',
     features: [
       'Módulo de Delivery com Web App Próprio (Sem comissões)',
       'Cardápio Digital (mesas, balcão, garçons e delivery)',
       'Monitor de Cozinha KDS Web em tempo real',
       'Alertas sonoros de novos pedidos',
       'Atalhos de teclado no caixa',
-    ],
-    cta: 'Começar com Essencial',
-    highlighted: false,
-    standalone: false,
-  },
-  {
-    planId: 'pedidos_fidelidade' as RestaurantPlan,
-    name: 'Profissional',
-    badge: 'Melhor Custo-Benefício',
-    priceOld: 99,
-    priceNew: 99.99,
-    description: 'Organize a cozinha e crie seu clube de recompensas para faturar mais.',
-    features: [
-      'Tudo do Essencial, mais:',
-      'Módulo Gula Fidelidade ativo',
-      'Campanha de pontos e cashback',
-      'Dashboard de retenção',
+      'Módulo Gula Fidelidade ativo: pontos, cashback e recompensas',
     ],
     cta: 'Começar com Profissional',
     highlighted: true,
@@ -87,7 +71,7 @@ const PRICING_CARDS = [
     name: 'Premium',
     badge: null,
     priceOld: 129,
-    priceNew: 139.99,
+    priceNew: 99.99,
     description: 'A solução definitiva de ponta a ponta para restaurantes que valorizam segurança alimentar.',
     features: [
       'Tudo do Profissional, mais:',
@@ -327,7 +311,7 @@ export default function LandingPage() {
               </div>
               <div className="flex-1 text-center sm:text-left">
                 <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/20 border border-amber-500/40 text-amber-300 text-xs font-semibold mb-3">
-                  <Sparkles className="w-3.5 h-3.5" /> Incluso a partir do Plano Essencial
+                  <Sparkles className="w-3.5 h-3.5" /> Incluso no Plano Profissional
                 </div>
                 <h3 className="text-xl sm:text-2xl font-bold text-white mb-2">Seu Canal de Delivery Próprio e Sem Taxas</h3>
                 <p className="text-sm sm:text-base text-slate-300 leading-relaxed max-w-2xl">
@@ -496,7 +480,7 @@ export default function LandingPage() {
           )}
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 lg:gap-8 items-stretch">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 lg:gap-8 items-stretch max-w-4xl mx-auto">
           {PRICING_CARDS.map((card) => {
             const plan = PLANS.find(p => p.id === card.planId);
             const variant = plan?.variants.find(v => v.tier === 'promo') ?? plan?.variants[0];

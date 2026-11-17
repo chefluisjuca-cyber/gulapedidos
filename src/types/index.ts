@@ -30,7 +30,7 @@ export interface Restaurant {
   updated_at: string;
 }
 
-export type RestaurantPlan = 'essencial' | 'pedidos_fidelidade' | 'pedidos_fidelidade_etiquetas' | 'gula_etiquetas_standalone' | 'gula_fila_standalone' | 'gula_feedback_standalone';
+export type RestaurantPlan = 'pedidos_fidelidade' | 'pedidos_fidelidade_etiquetas' | 'gula_etiquetas_standalone' | 'gula_fila_standalone' | 'gula_feedback_standalone';
 
 export type BillingCycle = 'mensal' | 'semestral' | 'anual';
 
@@ -57,17 +57,18 @@ export interface PlanDefinition {
 
 export const PLANS: PlanDefinition[] = [
   {
-    id: 'essencial',
-    name: 'Gula Pedidos',
-    tagline: 'Ideal para organizar a produção, gerenciar o salão e receber pedidos de delivery no seu próprio web app sem comissões.',
+    id: 'pedidos_fidelidade',
+    name: 'Profissional',
+    tagline: 'Tudo em um só plano: pedidos, delivery, fidelidade e mais.',
     features: [
       'Módulo de Delivery com Web App Próprio (Sem comissões)',
       'Cardápio Digital (mesas, balcão, garçons e delivery)',
       'Monitor de Cozinha KDS Web em tempo real',
       'Alertas sonoros de novos pedidos',
       'Atalhos de teclado no caixa',
+      'Módulo Gula Fidelidade: Pontos, Cashback e Recompensas',
     ],
-    modules: [MODULES.GULA_PEDIDOS],
+    modules: [MODULES.GULA_PEDIDOS, MODULES.GULA_FIDELIDADE],
     variants: [
       {
         tier: 'promo',
@@ -80,27 +81,26 @@ export const PLANS: PlanDefinition[] = [
       },
       {
         tier: 'regular',
-        label: 'Essencial',
+        label: 'Padrão',
         prices: [
           { cycle: 'mensal',    label: 'Mensal',    price:  69.99 },
-          { cycle: 'semestral', label: 'Semestral', price: 372.00 },
-          { cycle: 'anual',     label: 'Anual',     price: 649.00 },
+          { cycle: 'semestral', label: 'Semestral', price: 377.00 },
+          { cycle: 'anual',     label: 'Anual',     price: 672.00 },
         ],
       },
     ],
   },
   {
-    id: 'pedidos_fidelidade',
-    name: 'Pedidos + Fidelidade',
-    tagline: 'Tudo do Plano Pedidos + Gula Fidelidade',
+    id: 'pedidos_fidelidade_etiquetas',
+    name: 'Premium',
+    tagline: 'Tudo do Profissional + Gula Etiquetas com IA de validades.',
     features: [
-      'Tudo do Plano Pedidos',
-      'Módulo Gula Fidelidade',
-      'Pontos de Fidelidade',
-      'Cashback',
-      'Recompensas',
+      'Tudo do Plano Profissional',
+      'Módulo Gula Etiquetas',
+      'Assistente de IA para cálculo de validades (10 consultas/dia)',
+      'Etiquetas de Validade para Segurança Alimentar',
     ],
-    modules: [MODULES.GULA_PEDIDOS, MODULES.GULA_FIDELIDADE],
+    modules: [MODULES.GULA_PEDIDOS, MODULES.GULA_FIDELIDADE, MODULES.GULA_ETIQUETAS],
     variants: [
       {
         tier: 'promo',
@@ -115,33 +115,9 @@ export const PLANS: PlanDefinition[] = [
         tier: 'regular',
         label: 'Padrão',
         prices: [
-          { cycle: 'mensal',    label: 'Mensal',    price:  99.00 },
-          { cycle: 'semestral', label: 'Semestral', price: 530.00 },
-          { cycle: 'anual',     label: 'Anual',     price: 950.00 },
-        ],
-      },
-    ],
-  },
-  {
-    id: 'pedidos_fidelidade_etiquetas',
-    name: 'Completo',
-    tagline: 'Pedidos + Fidelidade + Etiquetas',
-    features: [
-      'Tudo do Plano Pedidos',
-      'Gula Fidelidade',
-      'Módulo Gula Etiquetas',
-      'Assistente de IA para cálculo de validades (10 consultas/dia)',
-      'Etiquetas de Validade para Segurança Alimentar',
-    ],
-    modules: [MODULES.GULA_PEDIDOS, MODULES.GULA_FIDELIDADE, MODULES.GULA_ETIQUETAS],
-    variants: [
-      {
-        tier: 'promo',
-        label: 'Promocional',
-        prices: [
-          { cycle: 'mensal',    label: 'Mensal',    price: 139.99 },
-          { cycle: 'semestral', label: 'Semestral', price: 125.99 },
-          { cycle: 'anual',     label: 'Anual',     price: 111.99 },
+          { cycle: 'mensal',    label: 'Mensal',    price:  99.99 },
+          { cycle: 'semestral', label: 'Semestral', price: 539.00 },
+          { cycle: 'anual',     label: 'Anual',     price: 959.00 },
         ],
       },
     ],
@@ -224,7 +200,6 @@ export const PLANS: PlanDefinition[] = [
 
 // Mercado Pago plan_type (edge function contract) per app plan id
 export const PLAN_TYPE_BY_PLAN: Record<RestaurantPlan, 'essencial' | 'profissional' | 'premium' | 'etiquetas' | 'fila' | 'feedback'> = {
-  essencial: 'essencial',
   pedidos_fidelidade: 'profissional',
   pedidos_fidelidade_etiquetas: 'premium',
   gula_etiquetas_standalone: 'etiquetas',

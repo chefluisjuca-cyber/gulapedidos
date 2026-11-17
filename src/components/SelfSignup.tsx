@@ -34,11 +34,10 @@ export default function SelfSignup() {
   if (mode === 'success' && result) {
     const standaloneRoute =
       initialPlan === 'gula_etiquetas_standalone' ? `/${result.slug}/etiquetas` :
-      initialPlan === 'gula_fila_standalone' || initialPlan === 'gula_feedback_standalone' ? `/${result.slug}/admin` :
       `/${result.slug}/admin`;
-    return <SuccessView slug={result.slug} name={result.name} plan={initialPlan ?? 'essencial'} onGoAdmin={() => navigate(standaloneRoute)} />;
+    return <SuccessView slug={result.slug} name={result.name} plan={initialPlan ?? 'pedidos_fidelidade'} onGoAdmin={() => navigate(standaloneRoute)} />;
   }
-  return <SignupForm initialPlan={initialPlan ?? 'essencial'} onBack={() => navigate('/')} onGoLogin={() => setMode('login')} onDone={(r) => { setResult(r); setMode('success'); }} />;
+  return <SignupForm initialPlan={initialPlan ?? 'pedidos_fidelidade'} onBack={() => navigate('/')} onGoLogin={() => setMode('login')} onDone={(r) => { setResult(r); setMode('success'); }} />;
 }
 
 // ── Signup Form ──────────────────────────────────────────────────────────────
@@ -119,7 +118,7 @@ function SignupForm({ initialPlan, onBack, onGoLogin, onDone }: {
           <h1 className="text-2xl font-bold text-slate-900">Crie sua conta</h1>
           <p className="text-slate-500 text-sm mt-1">7 dias grátis, sem cartão de crédito</p>
           <p className="text-amber-600 text-xs mt-2 font-medium">
-            Plano selecionado: {plan === 'essencial' ? 'Essencial' : plan === 'pedidos_fidelidade' ? 'Profissional' : plan === 'pedidos_fidelidade_etiquetas' ? 'Premium' : plan === 'gula_etiquetas_standalone' ? 'Gula Etiquetas' : plan === 'gula_fila_standalone' ? 'Gula Fila' : plan === 'gula_feedback_standalone' ? 'Gula Feedback' : 'Essencial'}
+            Plano selecionado: {plan === 'pedidos_fidelidade' ? 'Profissional' : plan === 'pedidos_fidelidade_etiquetas' ? 'Premium' : plan === 'gula_etiquetas_standalone' ? 'Gula Etiquetas' : plan === 'gula_fila_standalone' ? 'Gula Fila' : plan === 'gula_feedback_standalone' ? 'Gula Feedback' : 'Profissional'}
           </p>
         </div>
 
@@ -246,7 +245,7 @@ function SignupForm({ initialPlan, onBack, onGoLogin, onDone }: {
 
 // ── Success View ─────────────────────────────────────────────────────────────
 function SuccessView({ slug, name, plan, onGoAdmin }: { slug: string; name: string; plan: RestaurantPlan; onGoAdmin: () => void }) {
-  const isStandalone = plan !== 'essencial' && plan !== 'pedidos_fidelidade' && plan !== 'pedidos_fidelidade_etiquetas';
+  const isStandalone = plan !== 'pedidos_fidelidade' && plan !== 'pedidos_fidelidade_etiquetas';
   const isEtiquetasOnly = plan === 'gula_etiquetas_standalone';
   const PROD_ORIGIN = 'https://gulapedidos.com.br';
   const adminUrl = `${PROD_ORIGIN}/${slug}/${isEtiquetasOnly ? 'etiquetas' : 'admin'}`;
