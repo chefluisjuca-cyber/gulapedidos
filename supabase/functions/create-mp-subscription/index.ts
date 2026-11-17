@@ -134,11 +134,9 @@ Deno.serve(async (req: Request) => {
         billing_cycle,
       }),
       payer_email,
-      back_url: {
-        success: backUrl,
-        pending: backUrl,
-        failure: backUrl,
-      },
+      // back_url must be a plain string for the preapproval API (the
+      // success/pending/failure object form is only for /checkout/preferences).
+      back_url: backUrl,
       auto_recurring: {
         frequency: CYCLE_MONTHS[billing_cycle],
         frequency_type: "months",
@@ -162,8 +160,22 @@ Deno.serve(async (req: Request) => {
     if (!mpRes.ok) {
       const errorBody = await mpRes.text();
       console.error("create-mp-subscription: Mercado Pago error", mpRes.status, errorBody);
+      let mpMessage = errorBody;
+      try {
+        const parsed = JSON.parse(errorBody) as {
+          error?: string;
+          message?: string;
+          cause?: Array<{ code?: string; description?: string }>;
+        };
+        const causes = (parsed.cause ?? [])
+          .map((c) => `${c.code ?? ""}: ${c.description ?? ""}`.trim())
+          .join("; ");
+        mpMessage = [parsed.message ?? parsed.error, causes].filter(Boolean).join(" | ") || errorBody;
+      } catch {
+        // keep raw body
+      }
       return new Response(
-        JSON.stringify({ error: `Erro do Mercado Pago (${mpRes.status})` }),
+        JSON.stringify({ error: `Erro do Mercado Pago (${mpRes.status}): ${mpMessage}`.slice(0, 800) }),
         { status: 502, headers: { "Content-Type": "application/json", ...corsHeaders } },
       );
     }
